@@ -1,0 +1,14 @@
+[project]
+name = "companyrating"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.12.15",
+    "playwright>=1.55.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
