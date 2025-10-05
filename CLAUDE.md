@@ -19,7 +19,7 @@ A personal tool to automatically gather company ratings and career information f
 
 ### Core Scraping Functions
 1. `scrape_kununu_rating(company_name)` - Extract Kununu ratings
-2. `scrape_glassdoor_rating(company_name)` - Extract Glassdoor ratings  
+2. `scrape_glassdoor_rating(company_name)` - Extract Glassdoor ratings
 3. `find_career_page(company_name)` - Locate careers/jobs page
 4. `search_company_info(company_name)` - Orchestrate all lookups
 
@@ -36,7 +36,7 @@ CompanyInfo:
   - name: str
   - kununu_rating: Optional[float]
   - kununu_url: Optional[str]
-  - glassdoor_rating: Optional[float] 
+  - glassdoor_rating: Optional[float]
   - glassdoor_url: Optional[str]
   - career_page: Optional[str]
   - last_updated: datetime

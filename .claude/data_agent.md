@@ -5,7 +5,7 @@ Data modeling and storage specialist focused on efficient data structures, datab
 
 ## Responsibilities
 - Design optimal data models for company information storage
-- Implement efficient SQLite database schema and operations  
+- Implement efficient SQLite database schema and operations
 - Create data validation and cleaning pipelines
 - Handle data export/import in various formats (CSV, JSON, SQLite)
 - Design data archiving and versioning strategies
@@ -85,7 +85,7 @@ from enum import Enum
 
 class CompanySize(str, Enum):
     STARTUP = "startup"          # < 50 employees
-    SMALL = "small"              # 50-250 employees  
+    SMALL = "small"              # 50-250 employees
     MEDIUM = "medium"            # 250-1000 employees
     LARGE = "large"              # 1000+ employees
     ENTERPRISE = "enterprise"    # 10000+ employees
@@ -106,7 +106,7 @@ class Company(BaseModel):
     size_category: Optional[CompanySize] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    
+
     @validator('normalized_name', pre=True, always=True)
     def normalize_company_name(cls, v, values):
         if v is None and 'name' in values:
@@ -126,14 +126,14 @@ class ScrapingResult(BaseModel):
     scrape_status: ScrapeStatus
     error_details: Optional[str] = None
     scrape_duration_seconds: Optional[float] = None
-    
+
     @validator('kununu_rating', 'glassdoor_rating')
     def validate_rating_range(cls, v):
         if v is not None and not (0.0 <= v <= 5.0):
             raise ValueError('Rating must be between 0.0 and 5.0')
         return v
-    
-    @validator('kununu_review_count', 'glassdoor_review_count') 
+
+    @validator('kununu_review_count', 'glassdoor_review_count')
     def validate_review_count(cls, v):
         if v is not None and v < 0:
             raise ValueError('Review count cannot be negative')
@@ -152,7 +152,7 @@ class CompanySummary(BaseModel):
     total_reviews: int
     last_successful_scrape: Optional[datetime]
     scrape_success_rate: float  # Success rate over last 10 attempts
-    
+
     @property
     def is_data_fresh(self) -> bool:
         """Check if data is less than 30 days old"""
@@ -172,14 +172,14 @@ from contextlib import asynccontextmanager
 class DatabaseManager:
     def __init__(self, db_path: str):
         self.db_path = db_path
-    
+
     @asynccontextmanager
     async def connection(self):
         """Async context manager for database connections"""
         async with aiosqlite.connect(self.db_path) as conn:
             conn.row_factory = aiosqlite.Row  # Dict-like access
             yield conn
-    
+
     async def initialize_schema(self):
         """Create tables and indexes if they don't exist"""
         async with self.connection() as conn:
@@ -192,7 +192,7 @@ class DatabaseManager:
 class CompanyRepository:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
-    
+
     async def create_company(self, company: Company) -> int:
         """Insert new company and return ID"""
         async with self.db.connection() as conn:
@@ -202,7 +202,7 @@ class CompanyRepository:
             )
             await conn.commit()
             return cursor.lastrowid
-    
+
     async def get_company_by_name(self, name: str) -> Optional[Company]:
         """Find company by name (case-insensitive)"""
         normalized = normalize_company_name(name)
@@ -213,14 +213,14 @@ class CompanyRepository:
             )
             row = await cursor.fetchone()
             return Company(**row) if row else None
-    
+
     async def get_companies_needing_update(self, days_old: int = 30) -> List[Company]:
         """Get companies with stale data"""
         async with self.db.connection() as conn:
             cursor = await conn.execute("""
                 SELECT c.* FROM companies c
                 LEFT JOIN scraping_results sr ON c.id = sr.company_id
-                WHERE sr.scrape_date IS NULL 
+                WHERE sr.scrape_date IS NULL
                    OR sr.scrape_date < datetime('now', '-{} days')
                 GROUP BY c.id
             """.format(days_old))
@@ -240,15 +240,15 @@ def normalize_company_name(name: str) -> str:
     # Remove common suffixes
     suffixes = ['GmbH', 'AG', 'SE', 'Ltd', 'Inc', 'Corp', 'LLC', 'Co.']
     normalized = name.strip()
-    
+
     for suffix in suffixes:
         pattern = rf'\b{re.escape(suffix)}\b\.?$'
         normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
-    
+
     # Clean whitespace and punctuation
     normalized = re.sub(r'[^\w\s]', ' ', normalized)
     normalized = re.sub(r'\s+', ' ', normalized).strip()
-    
+
     return normalized.lower()
 
 def find_duplicate_companies(companies: List[Company]) -> List[Set[Company]]:
@@ -259,7 +259,7 @@ def find_duplicate_companies(companies: List[Company]) -> List[Set[Company]]:
         if normalized not in name_groups:
             name_groups[normalized] = []
         name_groups[normalized].append(company)
-    
+
     return [set(group) for group in name_groups.values() if len(group) > 1]
 ```
 
@@ -273,7 +273,7 @@ class DataQualityChecker:
             self.check_data_freshness,
             self.check_missing_critical_data
         ]
-    
+
     async def validate_scraping_result(self, result: ScrapingResult) -> List[str]:
         """Run all validators and return list of issues"""
         issues = []
@@ -282,7 +282,7 @@ class DataQualityChecker:
             if issue:
                 issues.append(issue)
         return issues
-    
+
     async def check_rating_reasonableness(self, result: ScrapingResult) -> Optional[str]:
         """Check if ratings are within reasonable bounds"""
         if result.kununu_rating and result.kununu_rating < 1.0:
@@ -299,13 +299,13 @@ class DataQualityChecker:
 class DataExporter:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
-    
+
     async def export_to_csv(self, filepath: str, include_history: bool = False):
         """Export current company data to CSV"""
         async with self.db.connection() as conn:
             if include_history:
                 query = """
-                SELECT c.name, sr.scrape_date, sr.kununu_rating, 
+                SELECT c.name, sr.scrape_date, sr.kununu_rating,
                        sr.glassdoor_rating, sr.career_page_url, sr.scrape_status
                 FROM companies c
                 LEFT JOIN scraping_results sr ON c.id = sr.company_id
@@ -313,22 +313,22 @@ class DataExporter:
                 """
             else:
                 query = """
-                SELECT c.name, 
-                       sr.kununu_rating, sr.glassdoor_rating, 
+                SELECT c.name,
+                       sr.kununu_rating, sr.glassdoor_rating,
                        sr.career_page_url, sr.scrape_date
                 FROM companies c
                 LEFT JOIN scraping_results sr ON c.id = sr.company_id
                 WHERE sr.scrape_date = (
-                    SELECT MAX(scrape_date) 
-                    FROM scraping_results 
+                    SELECT MAX(scrape_date)
+                    FROM scraping_results
                     WHERE company_id = c.id
                 )
                 ORDER BY c.name
                 """
-            
+
             cursor = await conn.execute(query)
             rows = await cursor.fetchall()
-            
+
             import csv
             with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
                 if rows:
@@ -336,19 +336,19 @@ class DataExporter:
                     writer.writeheader()
                     for row in rows:
                         writer.writerow(dict(row))
-    
+
     async def import_from_csv(self, filepath: str) -> int:
         """Import companies from CSV file"""
         import csv
         companies_added = 0
-        
+
         with open(filepath, 'r', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 company_name = row.get('name') or row.get('company_name')
                 if not company_name:
                     continue
-                
+
                 # Check if company already exists
                 existing = await self.get_company_by_name(company_name)
                 if not existing:
@@ -360,7 +360,7 @@ class DataExporter:
                     )
                     await self.create_company(company)
                     companies_added += 1
-        
+
         return companies_added
 ```
 
@@ -372,21 +372,21 @@ class BatchProcessor:
     def __init__(self, db_manager: DatabaseManager, batch_size: int = 100):
         self.db = db_manager
         self.batch_size = batch_size
-    
+
     async def batch_insert_results(self, results: List[ScrapingResult]):
         """Insert multiple scraping results efficiently"""
         async with self.db.connection() as conn:
             await conn.executemany("""
-                INSERT INTO scraping_results 
-                (company_id, scrape_date, kununu_rating, kununu_review_count, 
-                 kununu_url, glassdoor_rating, glassdoor_review_count, 
+                INSERT INTO scraping_results
+                (company_id, scrape_date, kununu_rating, kununu_review_count,
+                 kununu_url, glassdoor_rating, glassdoor_review_count,
                  glassdoor_url, career_page_url, scrape_status, error_details)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, [
                 (r.company_id, r.scrape_date, r.kununu_rating, r.kununu_review_count,
-                 str(r.kununu_url) if r.kununu_url else None, r.glassdoor_rating, 
+                 str(r.kununu_url) if r.kununu_url else None, r.glassdoor_rating,
                  r.glassdoor_review_count, str(r.glassdoor_url) if r.glassdoor_url else None,
-                 str(r.career_page_url) if r.career_page_url else None, r.scrape_status, 
+                 str(r.career_page_url) if r.career_page_url else None, r.scrape_status,
                  r.error_details)
                 for r in results
             ])
@@ -396,35 +396,35 @@ class BatchProcessor:
 ```python
 class AnalyticsQueries:
     """Optimized queries for reporting and analysis"""
-    
+
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
-    
+
     async def get_scraping_success_rate(self, days: int = 30) -> float:
         """Calculate overall scraping success rate"""
         async with self.db.connection() as conn:
             cursor = await conn.execute("""
-                SELECT 
+                SELECT
                     COUNT(*) as total_attempts,
                     SUM(CASE WHEN scrape_status = 'success' THEN 1 ELSE 0 END) as successful
-                FROM scraping_results 
+                FROM scraping_results
                 WHERE scrape_date > datetime('now', '-{} days')
             """.format(days))
             row = await cursor.fetchone()
             if row['total_attempts'] == 0:
                 return 0.0
             return row['successful'] / row['total_attempts']
-    
+
     async def get_top_rated_companies(self, min_reviews: int = 10, limit: int = 50) -> List[dict]:
         """Get highest rated companies with sufficient reviews"""
         async with self.db.connection() as conn:
             cursor = await conn.execute("""
-                SELECT 
+                SELECT
                     c.name,
                     sr.kununu_rating,
                     sr.glassdoor_rating,
-                    (COALESCE(sr.kununu_rating, 0) + COALESCE(sr.glassdoor_rating, 0)) / 
-                    (CASE WHEN sr.kununu_rating IS NULL THEN 0 ELSE 1 END + 
+                    (COALESCE(sr.kununu_rating, 0) + COALESCE(sr.glassdoor_rating, 0)) /
+                    (CASE WHEN sr.kununu_rating IS NULL THEN 0 ELSE 1 END +
                      CASE WHEN sr.glassdoor_rating IS NULL THEN 0 ELSE 1 END) as avg_rating,
                     (sr.kununu_review_count + sr.glassdoor_review_count) as total_reviews
                 FROM companies c
@@ -446,39 +446,39 @@ class AnalyticsQueries:
 class DataArchiver:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
-    
+
     async def archive_old_results(self, keep_days: int = 365):
         """Archive scraping results older than specified days"""
         cutoff_date = datetime.utcnow() - timedelta(days=keep_days)
-        
+
         async with self.db.connection() as conn:
             # Create archive table if it doesn't exist
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS scraping_results_archive
                 AS SELECT * FROM scraping_results WHERE 1=0
             """)
-            
+
             # Move old records to archive
             await conn.execute("""
                 INSERT INTO scraping_results_archive
-                SELECT * FROM scraping_results 
-                WHERE scrape_date < ? 
-                AND scrape_date < (
-                    SELECT MAX(scrape_date) FROM scraping_results sr2 
-                    WHERE sr2.company_id = scraping_results.company_id
-                )
-            """, (cutoff_date,))
-            
-            # Delete archived records from main table
-            cursor = await conn.execute("""
-                DELETE FROM scraping_results 
+                SELECT * FROM scraping_results
                 WHERE scrape_date < ?
                 AND scrape_date < (
-                    SELECT MAX(scrape_date) FROM scraping_results sr2 
+                    SELECT MAX(scrape_date) FROM scraping_results sr2
                     WHERE sr2.company_id = scraping_results.company_id
                 )
             """, (cutoff_date,))
-            
+
+            # Delete archived records from main table
+            cursor = await conn.execute("""
+                DELETE FROM scraping_results
+                WHERE scrape_date < ?
+                AND scrape_date < (
+                    SELECT MAX(scrape_date) FROM scraping_results sr2
+                    WHERE sr2.company_id = scraping_results.company_id
+                )
+            """, (cutoff_date,))
+
             await conn.commit()
             return cursor.rowcount
 ```
@@ -496,16 +496,16 @@ class DataConfig(BaseSettings):
     archive_after_days: int = 365
     max_results_per_company: int = 10  # Keep last N results
     batch_size: int = 100
-    
+
     # Export settings
     csv_encoding: str = "utf-8"
     include_historical_data: bool = False
-    
+
     # Data quality settings
     min_rating: float = 0.0
     max_rating: float = 5.0
     max_review_count: int = 100000
-    
+
     class Config:
         env_file = ".env"
         env_prefix = "DATA_"
@@ -518,34 +518,34 @@ class DataConfig(BaseSettings):
 class DataHealthMonitor:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
-    
+
     async def generate_health_report(self) -> dict:
         """Generate comprehensive data health report"""
         async with self.db.connection() as conn:
             # Basic counts
             companies_count = await self._get_scalar(conn, "SELECT COUNT(*) FROM companies")
             results_count = await self._get_scalar(conn, "SELECT COUNT(*) FROM scraping_results")
-            
+
             # Success rates
             success_rate_7d = await self._get_success_rate(conn, 7)
             success_rate_30d = await self._get_success_rate(conn, 30)
-            
+
             # Data freshness
             stale_companies = await self._get_scalar(conn, """
                 SELECT COUNT(*) FROM companies c
                 WHERE NOT EXISTS (
-                    SELECT 1 FROM scraping_results sr 
-                    WHERE sr.company_id = c.id 
+                    SELECT 1 FROM scraping_results sr
+                    WHERE sr.company_id = c.id
                     AND sr.scrape_date > datetime('now', '-30 days')
                 )
             """)
-            
+
             # Data completeness
             companies_with_ratings = await self._get_scalar(conn, """
                 SELECT COUNT(DISTINCT sr.company_id) FROM scraping_results sr
                 WHERE sr.kununu_rating IS NOT NULL OR sr.glassdoor_rating IS NOT NULL
             """)
-            
+
             return {
                 "total_companies": companies_count,
                 "total_results": results_count,
@@ -556,18 +556,18 @@ class DataHealthMonitor:
                 "coverage_rate": companies_with_ratings / companies_count if companies_count > 0 else 0,
                 "generated_at": datetime.utcnow().isoformat()
             }
-    
+
     async def _get_scalar(self, conn, query: str) -> int:
         cursor = await conn.execute(query)
         row = await cursor.fetchone()
         return row[0] if row else 0
-    
+
     async def _get_success_rate(self, conn, days: int) -> float:
         cursor = await conn.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) as total,
                 SUM(CASE WHEN scrape_status = 'success' THEN 1 ELSE 0 END) as successful
-            FROM scraping_results 
+            FROM scraping_results
             WHERE scrape_date > datetime('now', '-{} days')
         """.format(days))
         row = await cursor.fetchone()

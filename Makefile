@@ -121,3 +121,7 @@ clean:
 	rm -f data/results.db data/failed_lookups.csv results.csv
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
+
+
+scrape_jobs:
+	uv run src/jobspy_poc.py
