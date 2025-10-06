@@ -15,3 +15,7 @@ dependencies = [
 dev = [
     "pytest>=8.4.2",
 ]
+
+[tool.isort]
+profile = "black"
+src_paths = ["src", "test"]
