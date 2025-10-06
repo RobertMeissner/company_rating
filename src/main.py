@@ -3,6 +3,9 @@ import csv
 import pandas as pd
 
 from src.application.services.job_orchestrator import JobOrchestrator
+from src.infrastructure.adapters.company_command_file_based import (
+    CompanyCommandFileBasedAdapter,
+)
 from src.infrastructure.adapters.company_query_file_based import (
     CompanyQueryFileBasedAdapter,
 )
@@ -44,12 +47,23 @@ def outdated_main():
 
 
 def main():
+    job_query_adapter = JobQueryFileBasedAdapter()
+    company_query_adapter = CompanyQueryFileBasedAdapter()
+    company_command_adapter = CompanyCommandFileBasedAdapter()
     orchestrator = JobOrchestrator(
-        job_query_port=JobQueryFileBasedAdapter,
-        company_query_port=CompanyQueryFileBasedAdapter,
+        job_query_port=job_query_adapter,
+        company_query_port=company_query_adapter,
+        company_command_port=company_command_adapter,
     )
     print([job.title for job in orchestrator.jobs()])
-    print([job.name for job in orchestrator.companies()])
+    print(
+        len(orchestrator.companies()),
+        ":",
+        [job.name for job in orchestrator.companies()],
+    )
+    orchestrator.sort_companies()
+    orchestrator.deduplicate_companies()
+    orchestrator.write()
 
 
 if __name__ == "__main__":
