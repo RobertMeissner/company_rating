@@ -1,8 +1,15 @@
+import asyncio
+from dataclasses import asdict
+
+import pandas as pd
+
 from src.domain.entities.job import Job
 from src.domain.ports.company_command_port import CompanyCommandPort
 from src.domain.ports.company_query_port import CompanyQueryPort
+from src.domain.ports.company_scraper_port import CompanyScraper
 from src.domain.ports.job_query_port import JobQueryPort
 from src.domain.value_objects.company import Company
+from src.utils.settings import FILTERED_JOBS_FILENAME
 
 
 class JobOrchestrator:
@@ -13,10 +20,12 @@ class JobOrchestrator:
         job_query_port: JobQueryPort,
         company_query_port: CompanyQueryPort,
         company_command_port: CompanyCommandPort,
+        company_scraper: CompanyScraper,
     ):
         self._job_query_port = job_query_port
         self._company_query_port = company_query_port
         self._company_command_port = company_command_port
+        self._company_scraper_port = company_scraper
 
     def jobs(self) -> list[Job]:
         return self._job_query_port.get()
@@ -46,3 +55,17 @@ class JobOrchestrator:
         print(f"Before #companies: {len(self.companies())}")
         print(f"After deduplication #companies: {len(deduplicated_companies)}")
         self._companies = deduplicated_companies
+
+    def update_companies(self):
+        updated_companies = []
+        for company in self.companies():
+            updated_company = asyncio.run(
+                self._company_scraper_port.update(company.name)
+            )
+            updated_companies.append(updated_company)
+
+        self._companies = updated_companies
+
+    def export_to_csv(self):
+        df = pd.DataFrame([asdict(c) for c in self._companies])
+        df.to_csv(FILTERED_JOBS_FILENAME)

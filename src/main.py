@@ -10,6 +10,7 @@ from src.infrastructure.adapters.company_query_file_based import (
     CompanyQueryFileBasedAdapter,
 )
 from src.infrastructure.adapters.job_query_file_based import JobQueryFileBasedAdapter
+from src.infrastructure.scrapers.kununu_scraper import KununuScraper
 
 
 def outdated_main():
@@ -50,10 +51,12 @@ def main():
     job_query_adapter = JobQueryFileBasedAdapter()
     company_query_adapter = CompanyQueryFileBasedAdapter()
     company_command_adapter = CompanyCommandFileBasedAdapter()
+    kununu_scraper = KununuScraper()
     orchestrator = JobOrchestrator(
         job_query_port=job_query_adapter,
         company_query_port=company_query_adapter,
         company_command_port=company_command_adapter,
+        company_scraper=kununu_scraper,
     )
     print([job.title for job in orchestrator.jobs()])
     print(
@@ -63,7 +66,11 @@ def main():
     )
     orchestrator.sort_companies()
     orchestrator.deduplicate_companies()
+
     orchestrator.write()
+    orchestrator.export_to_csv()
+
+    orchestrator.update_companies()
 
 
 if __name__ == "__main__":
