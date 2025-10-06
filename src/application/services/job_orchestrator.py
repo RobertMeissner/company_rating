@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from dataclasses import asdict
 
 import pandas as pd
@@ -20,7 +21,7 @@ class JobOrchestrator:
         job_query_port: JobQueryPort,
         company_query_port: CompanyQueryPort,
         company_command_port: CompanyCommandPort,
-        company_scraper: CompanyScraper,
+        company_scraper: Callable[[], CompanyScraper],
     ):
         self._job_query_port = job_query_port
         self._company_query_port = company_query_port
@@ -56,15 +57,18 @@ class JobOrchestrator:
         print(f"After deduplication #companies: {len(deduplicated_companies)}")
         self._companies = deduplicated_companies
 
-    def update_companies(self):
-        updated_companies = []
-        for company in self.companies():
-            updated_company = asyncio.run(
-                self._company_scraper_port.update(company.name)
-            )
-            updated_companies.append(updated_company)
+    async def _scrape(self, companies: list[Company]) -> list[Company]:
 
-        self._companies = updated_companies
+        updated_companies = []
+        async with self._company_scraper_port() as scraper:
+            for company in companies:
+                updated_company = await scraper.update(company.name)
+                print(updated_company)
+                updated_companies.append(updated_company)
+        return updated_companies
+
+    def update_companies(self):
+        self._companies = asyncio.run(self._scrape(self.companies()))
 
     def export_to_csv(self):
         df = pd.DataFrame([asdict(c) for c in self._companies])

@@ -8,7 +8,9 @@ class Company:
     name: str
     location: str = ""
     kununu_rating: float = 0
+    kununu_review_count: int = 0
     glassdoor_rating: float = 0
+    glassdoor_review_count: int = 0
     alternative_names: list[str] = field(
         default_factory=list
     )  # in case depending on the platform, it has different names, spellings, ...

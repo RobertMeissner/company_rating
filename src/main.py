@@ -51,7 +51,7 @@ def main():
     job_query_adapter = JobQueryFileBasedAdapter()
     company_query_adapter = CompanyQueryFileBasedAdapter()
     company_command_adapter = CompanyCommandFileBasedAdapter()
-    kununu_scraper = KununuScraper()
+    kununu_scraper = KununuScraper
     orchestrator = JobOrchestrator(
         job_query_port=job_query_adapter,
         company_query_port=company_query_adapter,
@@ -71,6 +71,8 @@ def main():
     orchestrator.export_to_csv()
 
     orchestrator.update_companies()
+    orchestrator.write()
+    orchestrator.export_to_csv()
 
 
 if __name__ == "__main__":
