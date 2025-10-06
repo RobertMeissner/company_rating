@@ -8,28 +8,41 @@ from src.domain.entities.job import Job
 from src.domain.ports.company_command_port import CompanyCommandPort
 from src.domain.ports.company_query_port import CompanyQueryPort
 from src.domain.ports.company_scraper_port import CompanyScraper
+from src.domain.ports.job_command_port import JobCommandPort
 from src.domain.ports.job_query_port import JobQueryPort
+from src.domain.ports.job_scraper_port import JobScraper
 from src.domain.value_objects.company import Company
-from src.utils.settings import FILTERED_JOBS_FILENAME
+from src.utils.settings import FILTERED_COMPANIES_FILENAME, FILTERED_JOBS_FILENAME
 
 
 class JobOrchestrator:
     _companies: list[Company] = []
+    _jobs: list[Job] = []
 
     def __init__(
         self,
         job_query_port: JobQueryPort,
+        job_command_port: JobCommandPort,
         company_query_port: CompanyQueryPort,
         company_command_port: CompanyCommandPort,
         company_scraper: Callable[[], CompanyScraper],
+        job_scraper_port: JobScraper,
     ):
         self._job_query_port = job_query_port
+        self._job_command_port = job_command_port
         self._company_query_port = company_query_port
         self._company_command_port = company_command_port
         self._company_scraper_port = company_scraper
+        self._job_scraper_port = job_scraper_port
 
     def jobs(self) -> list[Job]:
-        return self._job_query_port.get()
+        if not self._jobs:
+            self._jobs = self._job_query_port.get()
+        return self._jobs
+
+    def scrape_jobs(self) -> list[Job]:
+        self._jobs = self._job_scraper_port.jobs()
+        return self._jobs
 
     def companies(self) -> list[Company]:
         if not self._companies:
@@ -38,6 +51,7 @@ class JobOrchestrator:
 
     def write(self):
         self._company_command_port.write(self.companies())
+        self._job_command_port.write(self.jobs())
 
     def sort_companies(self):
         self._companies.sort(key=lambda c: c.name.lower())
@@ -72,4 +86,6 @@ class JobOrchestrator:
 
     def export_to_csv(self):
         df = pd.DataFrame([asdict(c) for c in self._companies])
+        df.to_csv(FILTERED_COMPANIES_FILENAME)
+        df = pd.DataFrame([asdict(c) for c in self._jobs])
         df.to_csv(FILTERED_JOBS_FILENAME)
