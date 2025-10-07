@@ -1,18 +1,9 @@
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 
 from src.domain.entities.job import Job
+from src.models.job_dict import JobDict
 from src.utils.settings import DATA_FOLDER, JOB_FILENAME
-
-
-@dataclass
-class JobDict:
-    job_id: str
-    url: str
-    company_name: str
-    working_model: str
-    salary: int
-    title: str
 
 
 class JobCommandFileBasedAdapter:

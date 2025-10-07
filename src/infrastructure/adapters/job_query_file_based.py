@@ -19,9 +19,16 @@ class JobQueryFileBasedAdapter:
         df = pd.read_csv(f"{DATA_FOLDER}/jobs.csv")
         jobs = []
         for index, row in df.iterrows():
+            # Prefer job_url_direct, fall back to job_url if not available
+            url = (
+                row.get("job_url_direct")
+                if pd.notna(row.get("job_url_direct"))
+                else row.get("job_url", "")
+            )
+
             job = Job(
                 job_id=row["id"],
-                url=row["job_url_direct"],
+                url=url,
                 title=row["title"],
                 salary=0,
                 company_name=row["company"],

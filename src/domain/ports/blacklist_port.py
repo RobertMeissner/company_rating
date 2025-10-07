@@ -1,0 +1,13 @@
+from typing import Protocol
+
+
+class BlacklistPort(Protocol):
+    """Port for reading and writing entity blacklist"""
+
+    def get(self) -> list[str]: ...
+
+    def add(self, entity: str) -> None: ...
+
+    def remove(self, entity: str) -> None: ...
+
+    def write(self, entities: list[str]) -> None: ...

@@ -1,3 +1,4 @@
+import pandas as pd
 from jobspy import scrape_jobs
 
 from src.domain.entities.job import Job
@@ -43,7 +44,12 @@ class JobspyScraper:
                         [
                             Job(
                                 job_id=row.id,
-                                url=row.job_url,
+                                url=(
+                                    row.job_url_direct
+                                    if hasattr(row, "job_url_direct")
+                                    and pd.notna(row.job_url_direct)
+                                    else row.job_url
+                                ),
                                 company_name=row.company,
                                 title=row.title,
                                 salary=0,

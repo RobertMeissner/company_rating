@@ -5,6 +5,7 @@ from dataclasses import asdict
 import pandas as pd
 
 from src.domain.entities.job import Job
+from src.domain.ports.blacklist_port import BlacklistPort
 from src.domain.ports.company_command_port import CompanyCommandPort
 from src.domain.ports.company_query_port import CompanyQueryPort
 from src.domain.ports.company_scraper_port import CompanyScraper
@@ -12,6 +13,7 @@ from src.domain.ports.job_command_port import JobCommandPort
 from src.domain.ports.job_query_port import JobQueryPort
 from src.domain.ports.job_scraper_port import JobScraper
 from src.domain.value_objects.company import Company
+from src.models.job_dict import JobDict
 from src.utils.settings import FILTERED_COMPANIES_FILENAME, FILTERED_JOBS_FILENAME
 
 
@@ -27,6 +29,8 @@ class JobOrchestrator:
         company_command_port: CompanyCommandPort,
         company_scraper: Callable[[], CompanyScraper],
         job_scraper_port: JobScraper,
+        company_blacklist_port: BlacklistPort,
+        job_blacklist_port: BlacklistPort,
     ):
         self._job_query_port = job_query_port
         self._job_command_port = job_command_port
@@ -34,6 +38,8 @@ class JobOrchestrator:
         self._company_command_port = company_command_port
         self._company_scraper_port = company_scraper
         self._job_scraper_port = job_scraper_port
+        self._company_blacklist_port = company_blacklist_port
+        self._job_blacklist_port = job_blacklist_port
 
     def jobs(self) -> list[Job]:
         if not self._jobs:
@@ -89,3 +95,93 @@ class JobOrchestrator:
         df.to_csv(FILTERED_COMPANIES_FILENAME)
         df = pd.DataFrame([asdict(c) for c in self._jobs])
         df.to_csv(FILTERED_JOBS_FILENAME)
+
+    def get_jobs_dataframe(
+        self, min_rating: float = 0.0, apply_blacklist: bool = True
+    ) -> pd.DataFrame:
+        jobs_df = pd.DataFrame(
+            [
+                asdict(
+                    JobDict(
+                        job_id=job.job_id,
+                        url=job.url,
+                        company_name=job.company_name,
+                        working_model=job.working_model,
+                        salary=job.salary,
+                        title=job.title,
+                    )
+                )
+                for job in self.jobs()
+            ]
+        )
+        companies_df = pd.DataFrame([asdict(c) for c in self.companies()])
+
+        if jobs_df.empty:
+            return pd.DataFrame()
+
+        merged = pd.merge(
+            jobs_df,
+            companies_df[
+                [
+                    "name",
+                    "kununu_rating",
+                    "kununu_review_count",
+                    "glassdoor_rating",
+                    "glassdoor_review_count",
+                    "location",
+                ]
+            ],
+            left_on="company_name",
+            right_on="name",
+            how="left",
+        ).drop(
+            "name", axis=1
+        )  # Remove duplicate 'name' column
+
+        if apply_blacklist:
+            company_blacklist = self._blacklist(self._company_blacklist_port)
+            if company_blacklist:
+                merged = merged[~merged["company_name"].isin(company_blacklist)]
+
+            job_blacklist = self._blacklist(self._job_blacklist_port)
+            if job_blacklist:
+                merged = merged[~merged["job_id"].isin(job_blacklist)]
+
+        if min_rating > 0.0:
+            merged = merged[
+                (merged["kununu_rating"] >= min_rating)
+                | (merged["kununu_rating"].isna())
+            ]
+
+        return merged
+
+    def company_blacklist(self):
+        return self._blacklist(self._company_blacklist_port)
+
+    def job_blacklist(self):
+        return self._blacklist(self._job_blacklist_port)
+
+    def write_company_blacklist(self):
+        self._company_blacklist_port.write(self.company_blacklist())
+
+    def write_job_blacklist(self):
+        self._job_blacklist_port.write(self.job_blacklist())
+
+    def _blacklist(self, port: BlacklistPort) -> list[str]:
+        return port.get()
+
+    def add_to_blacklist(self, company_name: str) -> None:
+        if self._company_blacklist_port:
+            self._company_blacklist_port.add(company_name)
+
+    def remove_from_blacklist(self, company_name: str) -> None:
+        if self._company_blacklist_port:
+            self._company_blacklist_port.remove(company_name)
+
+    def add_to_job_blacklist(self, job_id: str) -> None:
+        if self._job_blacklist_port:
+            self._job_blacklist_port.add(job_id)
+
+    def remove_from_job_blacklist(self, job_id: str) -> None:
+        if self._job_blacklist_port:
+            self._job_blacklist_port.remove(job_id)

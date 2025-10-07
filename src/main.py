@@ -3,6 +3,9 @@ import csv
 import pandas as pd
 
 from src.application.services.job_orchestrator import JobOrchestrator
+from src.infrastructure.adapters.blacklist_file_based import (
+    BlacklistFileBasedAdapter,
+)
 from src.infrastructure.adapters.company_command_file_based import (
     CompanyCommandFileBasedAdapter,
 )
@@ -15,6 +18,7 @@ from src.infrastructure.adapters.job_command_file_based import (
 from src.infrastructure.adapters.job_query_file_based import JobQueryFileBasedAdapter
 from src.infrastructure.scrapers.jobspy_scraper import JobspyScraper
 from src.infrastructure.scrapers.kununu_scraper import KununuScraper
+from utils.settings import COMPANY_BLACKLIST_FILENAME, JOB_BLACKLIST_FILENAME
 
 
 def outdated_main():
@@ -51,24 +55,8 @@ def outdated_main():
     )
 
 
-def main():
-    job_query_adapter = JobQueryFileBasedAdapter()
-    job_command_adapter = JobCommandFileBasedAdapter()
-
-    company_query_adapter = CompanyQueryFileBasedAdapter()
-    company_command_adapter = CompanyCommandFileBasedAdapter()
-
-    kununu_scraper = KununuScraper
-    job_scraper_adapter = JobspyScraper()
-
-    orchestrator = JobOrchestrator(
-        job_query_port=job_query_adapter,
-        job_command_port=job_command_adapter,
-        company_query_port=company_query_adapter,
-        company_command_port=company_command_adapter,
-        company_scraper=kununu_scraper,
-        job_scraper_port=job_scraper_adapter,
-    )
+def bootstrap():
+    orchestrator = job_orchestrator()
     print([job.title for job in orchestrator.jobs()])
     print(
         len(orchestrator.companies()),
@@ -91,5 +79,35 @@ def main():
     orchestrator.write()
 
 
+def job_orchestrator():
+    job_query_adapter = JobQueryFileBasedAdapter()
+    job_command_adapter = JobCommandFileBasedAdapter()
+    company_query_adapter = CompanyQueryFileBasedAdapter()
+    company_command_adapter = CompanyCommandFileBasedAdapter()
+    company_blacklist_adapter = BlacklistFileBasedAdapter(COMPANY_BLACKLIST_FILENAME)
+    job_blacklist_adapter = BlacklistFileBasedAdapter(JOB_BLACKLIST_FILENAME)
+    kununu_scraper = KununuScraper
+    job_scraper_adapter = JobspyScraper()
+    orchestrator = JobOrchestrator(
+        job_query_port=job_query_adapter,
+        job_command_port=job_command_adapter,
+        company_query_port=company_query_adapter,
+        company_command_port=company_command_adapter,
+        company_scraper=kununu_scraper,
+        job_scraper_port=job_scraper_adapter,
+        company_blacklist_port=company_blacklist_adapter,
+        job_blacklist_port=job_blacklist_adapter,
+    )
+    return orchestrator
+
+
+def connect_company_to_jobs():
+    orchestrator = job_orchestrator()
+    df = orchestrator.get_jobs_dataframe()
+    print(df.head())
+
+
 if __name__ == "__main__":
-    main()
+    if False:
+        bootstrap()
+    connect_company_to_jobs()
