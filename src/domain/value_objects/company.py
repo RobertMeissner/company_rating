@@ -14,4 +14,5 @@ class Company:
     alternative_names: list[str] = field(
         default_factory=list
     )  # in case depending on the platform, it has different names, spellings, ...
-    url: str = ""
+    url: str = ""  # Kununu profile URL
+    website: str = ""  # Company's actual website

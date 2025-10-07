@@ -139,6 +139,7 @@ class KununuScraper:
             kununu_rating=scraped_company.rating,
             url=scraped_company.profile_url,
             kununu_review_count=scraped_company.review_count,
+            website=scraped_company.company_website,
         )
 
     async def _scrape_rating(self) -> float:
@@ -160,6 +161,19 @@ class KununuScraper:
             )
         return count
 
+    async def _company_website(self) -> str:
+        """Extract company website URL from the page"""
+        try:
+            # Look for the link with id="company-link-website"
+            website_element = await self.page.query_selector("#company-link-website")
+            if website_element:
+                href = await website_element.get_attribute("href")
+                return href if href else ""
+            return ""
+        except Exception as e:
+            logger.debug(f"Could not extract company website: {e}")
+            return ""
+
     async def _random_delay(self):
         await asyncio.sleep(random.uniform(*self.random_human_delay_range))
 
@@ -178,6 +192,7 @@ class KununuScraper:
         if response.status == 200:
             result.rating = await self._scrape_rating()
             result.review_count = await self._review_count()
+            result.company_website = await self._company_website()
             result.success = True
 
         result.scrape_duration = time.time() - start_time

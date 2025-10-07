@@ -18,6 +18,7 @@ class ScraperModel:
     rating: Optional[float] = None
     review_count: Optional[int] = None
     profile_url: Optional[str] = None
+    company_website: Optional[str] = None
     scraped_at: datetime = None
     success: bool = False
     error_message: Optional[str] = None

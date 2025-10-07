@@ -29,10 +29,10 @@ class JobspyScraper:
                     df_jobs = scrape_jobs(
                         site_name=site,
                         search_term=search_term,
-                        google_search_term="AI engineer jobs near Münster, since last month",
+                        google_search_term="AI engineer jobs near Münster, since last week",
                         location="Münster",
                         results_wanted=100,
-                        hours_old=24 * 60,
+                        hours_old=24 * 7,
                         country_indeed="germany",
                         linkedin_fetch_description=True,  # gets more info such as description, direct job url (slower)
                         # proxies=["208.195.175.46:65095", "208.195.175.45:65095", "localhost"],

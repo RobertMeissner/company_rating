@@ -1,4 +1,5 @@
 import csv
+from enum import Enum
 
 import pandas as pd
 
@@ -18,7 +19,11 @@ from src.infrastructure.adapters.job_command_file_based import (
 from src.infrastructure.adapters.job_query_file_based import JobQueryFileBasedAdapter
 from src.infrastructure.scrapers.jobspy_scraper import JobspyScraper
 from src.infrastructure.scrapers.kununu_scraper import KununuScraper
-from src.utils.settings import COMPANY_BLACKLIST_FILENAME, JOB_BLACKLIST_FILENAME
+from src.utils.settings import (
+    COMPANIES_MISSING_RATING_FILENAME,
+    COMPANY_BLACKLIST_FILENAME,
+    JOB_BLACKLIST_FILENAME,
+)
 
 
 def outdated_main():
@@ -110,12 +115,114 @@ def connect_company_to_jobs():
 def daily_chore():
     orchestrator = job_orchestrator()
     orchestrator.scrape_jobs()
+    orchestrator.filter_blacklisted_jobs()
     orchestrator.deduplicate_jobs()
     orchestrator.write()
+
+
+def export_companies_without_ratings():
+    orchestrator = job_orchestrator()
+    companies_without_ratings = [
+        {"company_name": c.name, "alternative_name": c.alternative_names}
+        for c in orchestrator.companies()
+        if (
+            c.alternative_names
+            and c.alternative_names[0] != "void"
+            and c.kununu_rating is None
+        )
+        or (not c.alternative_names and c.kununu_rating is None)
+    ]
+
+    df = pd.DataFrame(companies_without_ratings)
+    df.to_csv(COMPANIES_MISSING_RATING_FILENAME, index=False)
+
+
+def import_alternative_names():
+    from dataclasses import replace
+
+    orchestrator = job_orchestrator()
+
+    df = pd.read_csv(COMPANIES_MISSING_RATING_FILENAME)
+
+    alternatives = {}
+    for _, row in df.iterrows():
+        if pd.notna(row["alternative_name"]) and row["alternative_name"].strip():
+            alternatives[row["company_name"]] = row["alternative_name"].strip()
+
+    # Update companies with alternative names
+    updated_companies = []
+    for company in orchestrator.companies():
+        if company.name in alternatives:
+            # Create new company with alternative name
+            updated_company = replace(
+                company, alternative_names=[alternatives[company.name]]
+            )
+            updated_companies.append(updated_company)
+            print(f"Updated {company.name} -> {alternatives[company.name]}")
+        else:
+            updated_companies.append(company)
+
+    orchestrator.set_companies(updated_companies)
+    orchestrator.write()
+
+
+def rescrape_companies():
+    orchestrator = job_orchestrator()
+
+    companies_to_scrape = [
+        c
+        for c in orchestrator.companies()
+        if (
+            c.alternative_names
+            and c.alternative_names[0] != "void"
+            and c.kununu_rating is None
+        )
+        or (not c.alternative_names and c.kununu_rating is None)
+    ]
+
+    if not companies_to_scrape:
+        print("No companies with alternative names found")
+        return
+
+    # Temporarily set companies to only those we want to scrape
+    all_companies = orchestrator.companies()
+    orchestrator.set_companies(companies_to_scrape)
+    orchestrator.update_companies()
+
+    # Merge back updated companies
+    updated_map = {c.name: c for c in orchestrator.companies()}
+    orchestrator.set_companies([updated_map.get(c.name, c) for c in all_companies])
+
+    orchestrator.write()
+
+
+def rescrape_everything():
+    orchestrator = job_orchestrator()
+    orchestrator.update_companies()
+    orchestrator.write()
+
+
+class Tasks(Enum):
+    DAILY = "daily"
+    EXPORT = "export"
+    IMPORT = "import"
+    RESCRAPE = "rescrape"
 
 
 if __name__ == "__main__":
     if False:
         bootstrap()
         connect_company_to_jobs()
-    daily_chore()
+
+    task = Tasks.DAILY
+
+    match task:
+        case Tasks.DAILY:
+            daily_chore()
+        case Tasks.EXPORT:
+            export_companies_without_ratings()
+        case Tasks.IMPORT:
+            import_alternative_names()
+            rescrape_companies()
+        case Tasks.RESCRAPE:
+            rescrape_everything()

@@ -47,50 +47,10 @@ def get_orchestrator() -> JobOrchestrator:
     )
 
 
-def main():
-    st.set_page_config(page_title="Job Search Dashboard", layout="wide")
-    st.title("Job Search Dashboard")
-
-    orchestrator = get_orchestrator()
-
-    # Sidebar filters
-    st.sidebar.header("Filters")
-
-    # Minimum rating filter
-    min_rating = st.sidebar.slider(
-        "Minimum Kununu Rating",
-        min_value=0.0,
-        max_value=5.0,
-        value=0.0,
-        step=0.1,
-        help="Filter jobs by minimum company rating (0 = show all)",
-    )
-
-    # Blacklist management
-    st.sidebar.header("Blacklist Management")
-
-    # Get all unique company names
-    all_companies = sorted([company.name for company in orchestrator.companies()])
-    current_blacklist = orchestrator.company_blacklist()
-
-    # Multiselect for blacklist
-    selected_blacklist = st.sidebar.multiselect(
-        "Blacklisted Companies",
-        options=all_companies,
-        default=current_blacklist,
-        help="Select companies to exclude from results",
-    )
-
-    # Update blacklist if changed
-    if set(selected_blacklist) != set(current_blacklist):
-        # Add newly selected companies
-        for company in set(selected_blacklist) - set(current_blacklist):
-            orchestrator.add_to_blacklist(company)
-        # Remove deselected companies
-        for company in set(current_blacklist) - set(selected_blacklist):
-            orchestrator.remove_from_blacklist(company)
-        st.sidebar.success("Blacklist updated!")
-
+def render_jobs_tab(
+    orchestrator: JobOrchestrator, min_rating: float, current_blacklist: list[str]
+):
+    """Render the jobs tab content"""
     # Get filtered jobs dataframe
     df = orchestrator.get_jobs_dataframe(min_rating=min_rating, apply_blacklist=True)
 
@@ -194,11 +154,143 @@ def main():
             )
             st.button("Refresh", on_click=st.rerun)
 
+
+def render_companies_tab(orchestrator: JobOrchestrator):
+    """Render the companies tab content"""
+    from dataclasses import asdict
+
+    import pandas as pd
+
+    companies = orchestrator.companies()
+
+    # Display stats
+    st.header("Overview")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Companies", len(companies))
+    with col2:
+        companies_with_rating = sum(
+            1 for c in companies if c.kununu_rating and c.kununu_rating > 0
+        )
+        st.metric("With Rating", companies_with_rating)
+    with col3:
+        avg_rating = (
+            sum(c.kununu_rating for c in companies if c.kununu_rating)
+            / companies_with_rating
+            if companies_with_rating > 0
+            else 0
+        )
+        st.metric("Avg Rating", f"{avg_rating:.2f}" if avg_rating else "N/A")
+
+    # Display companies table
+    st.header("Company List")
+
+    if not companies:
+        st.warning("No companies found.")
+    else:
+        # Convert to DataFrame
+        df = pd.DataFrame([asdict(c) for c in companies])
+
+        # Select and reorder columns
+        display_columns = [
+            "name",
+            "kununu_rating",
+            "kununu_review_count",
+            "location",
+            "website",
+            "url",
+        ]
+        display_columns = [col for col in display_columns if col in df.columns]
+
+        # Sort by rating (descending), then by name
+        df_display = (
+            df[display_columns]
+            .sort_values(
+                by=["kununu_rating", "name"],
+                ascending=[False, True],
+                na_position="last",
+            )
+            .copy()
+        )
+
+        # Format the dataframe
+        st.dataframe(
+            df_display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "name": st.column_config.TextColumn("Company Name", width="large"),
+                "kununu_rating": st.column_config.NumberColumn(
+                    "Rating", format="%.2f", width=100
+                ),
+                "kununu_review_count": st.column_config.NumberColumn(
+                    "Reviews", width=100
+                ),
+                "location": st.column_config.TextColumn("Location", width="medium"),
+                "website": st.column_config.LinkColumn("Website", width="large"),
+                "url": st.column_config.LinkColumn("Kununu", width="large"),
+            },
+        )
+
+
+def main():
+    st.set_page_config(page_title="Job Search Dashboard", layout="wide")
+    st.title("Job Search Dashboard")
+
+    orchestrator = get_orchestrator()
+
+    # Sidebar filters
+    st.sidebar.header("Filters")
+
+    # Minimum rating filter
+    min_rating = st.sidebar.slider(
+        "Minimum Kununu Rating",
+        min_value=0.0,
+        max_value=5.0,
+        value=4.0,
+        step=0.1,
+        help="Filter jobs by minimum company rating (0 = show all)",
+    )
+
+    # Blacklist management
+    st.sidebar.header("Blacklist Management")
+
+    # Get all unique company names
+    all_companies = sorted([company.name for company in orchestrator.companies()])
+    current_blacklist = orchestrator.company_blacklist()
+
+    # Multiselect for blacklist
+    selected_blacklist = st.sidebar.multiselect(
+        "Blacklisted Companies",
+        options=all_companies,
+        default=current_blacklist,
+        help="Select companies to exclude from results",
+    )
+
+    # Update blacklist if changed
+    if set(selected_blacklist) != set(current_blacklist):
+        # Add newly selected companies
+        for company in set(selected_blacklist) - set(current_blacklist):
+            orchestrator.add_to_blacklist(company)
+        # Remove deselected companies
+        for company in set(current_blacklist) - set(selected_blacklist):
+            orchestrator.remove_from_blacklist(company)
+        st.sidebar.success("Blacklist updated!")
+
     # Export functionality
     st.sidebar.header("Export")
     if st.sidebar.button("Export to CSV"):
         orchestrator.export_to_csv()
         st.sidebar.success("Exported to data/filtered_jobs.csv")
+
+    # Create tabs
+    tab1, tab2 = st.tabs(["📋 Jobs", "🏢 Companies"])
+
+    with tab1:
+        render_jobs_tab(orchestrator, min_rating, current_blacklist)
+
+    with tab2:
+        render_companies_tab(orchestrator)
 
 
 if __name__ == "__main__":

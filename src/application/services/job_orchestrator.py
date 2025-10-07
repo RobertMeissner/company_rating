@@ -56,6 +56,9 @@ class JobOrchestrator:
             self._companies = self._company_query_port.get()
         return self._companies
 
+    def set_companies(self, companies: list[Company]):
+        self._companies = companies
+
     def write(self):
         self._company_command_port.write(self.companies())
         self._job_command_port.write(self.jobs())
@@ -92,12 +95,33 @@ class JobOrchestrator:
         )
         self._jobs = deduplicated_jobs
 
+    def filter_blacklisted_jobs(self):
+        """Remove jobs that are in the blacklist"""
+        blacklist = self.job_blacklist()
+        if not blacklist:
+            print("No jobs in blacklist, skipping filter")
+            return
+
+        before_count = len(self._jobs)
+        self._jobs = [job for job in self._jobs if job.job_id not in blacklist]
+        filtered_count = before_count - len(self._jobs)
+
+        print(
+            f"Filtered {filtered_count} blacklisted jobs. Remaining: {len(self._jobs)}"
+        )
+
     async def _scrape(self, companies: list[Company]) -> list[Company]:
 
         updated_companies = []
         async with self._company_scraper_port() as scraper:
             for company in companies:
-                updated_company = await scraper.update(company.name)
+                # Prefer alternative name if available, otherwise use company name
+                name_to_scrape = (
+                    company.alternative_names[0]
+                    if company.alternative_names
+                    else company.name.replace(" ", "-")
+                )
+                updated_company = await scraper.update(name_to_scrape)
                 print(updated_company)
                 updated_companies.append(updated_company)
         return updated_companies
