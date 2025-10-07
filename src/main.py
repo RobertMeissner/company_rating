@@ -18,7 +18,7 @@ from src.infrastructure.adapters.job_command_file_based import (
 from src.infrastructure.adapters.job_query_file_based import JobQueryFileBasedAdapter
 from src.infrastructure.scrapers.jobspy_scraper import JobspyScraper
 from src.infrastructure.scrapers.kununu_scraper import KununuScraper
-from utils.settings import COMPANY_BLACKLIST_FILENAME, JOB_BLACKLIST_FILENAME
+from src.utils.settings import COMPANY_BLACKLIST_FILENAME, JOB_BLACKLIST_FILENAME
 
 
 def outdated_main():
@@ -107,7 +107,15 @@ def connect_company_to_jobs():
     print(df.head())
 
 
+def daily_chore():
+    orchestrator = job_orchestrator()
+    orchestrator.scrape_jobs()
+    orchestrator.deduplicate_jobs()
+    orchestrator.write()
+
+
 if __name__ == "__main__":
     if False:
         bootstrap()
-    connect_company_to_jobs()
+        connect_company_to_jobs()
+    daily_chore()

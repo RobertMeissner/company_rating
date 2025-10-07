@@ -44,6 +44,7 @@ class JobOrchestrator:
     def jobs(self) -> list[Job]:
         if not self._jobs:
             self._jobs = self._job_query_port.get()
+
         return self._jobs
 
     def scrape_jobs(self) -> list[Job]:
@@ -77,6 +78,20 @@ class JobOrchestrator:
         print(f"After deduplication #companies: {len(deduplicated_companies)}")
         self._companies = deduplicated_companies
 
+    def deduplicate_jobs(self):
+        deduplicated_jobs = []
+        seen_ids = set()
+
+        for job in self.jobs():
+            if job.job_id not in seen_ids:
+                seen_ids.add(job.job_id)
+                deduplicated_jobs.append(job)
+
+        print(
+            f"Before #jobs: {len(self.jobs())}. After deduplication #jobs: {len(deduplicated_jobs)}"
+        )
+        self._jobs = deduplicated_jobs
+
     async def _scrape(self, companies: list[Company]) -> list[Company]:
 
         updated_companies = []
@@ -91,14 +106,15 @@ class JobOrchestrator:
         self._companies = asyncio.run(self._scrape(self.companies()))
 
     def export_to_csv(self):
-        df = pd.DataFrame([asdict(c) for c in self._companies])
+        df = pd.DataFrame([asdict(c) for c in self.companies()])
         df.to_csv(FILTERED_COMPANIES_FILENAME)
-        df = pd.DataFrame([asdict(c) for c in self._jobs])
+        df = pd.DataFrame([asdict(c) for c in self.jobs()])
         df.to_csv(FILTERED_JOBS_FILENAME)
 
     def get_jobs_dataframe(
         self, min_rating: float = 0.0, apply_blacklist: bool = True
     ) -> pd.DataFrame:
+        self.deduplicate_jobs()
         jobs_df = pd.DataFrame(
             [
                 asdict(
