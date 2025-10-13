@@ -82,16 +82,30 @@ class JobOrchestrator:
         self._companies = deduplicated_companies
 
     def deduplicate_jobs(self):
-        deduplicated_jobs = []
-        seen_ids = set()
 
+        # dedup by job_id
+        seen_ids = set()
+        deduplicated_jobs = []
         for job in self.jobs():
             if job.job_id not in seen_ids:
                 seen_ids.add(job.job_id)
                 deduplicated_jobs.append(job)
 
         print(
-            f"Before #jobs: {len(self.jobs())}. After deduplication #jobs: {len(deduplicated_jobs)}"
+            f"Before #jobs: {len(self.jobs())}. After dedup id's #jobs: {len(deduplicated_jobs)}"
+        )
+        self._jobs = deduplicated_jobs
+
+        # dedup by url
+        seen_urls = set()
+        deduplicated_jobs = []
+        for job in self._jobs:
+            if job.url not in seen_urls:
+                seen_urls.add(job.url)
+                deduplicated_jobs.append(job)
+
+        print(
+            f"Before #jobs: {len(self.jobs())}. After dedup url's #jobs: {len(deduplicated_jobs)}"
         )
         self._jobs = deduplicated_jobs
 

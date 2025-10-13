@@ -4,6 +4,9 @@ from pathlib import Path
 # Add project root to Python path for src imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from dataclasses import asdict
+
+import pandas as pd
 import streamlit as st
 
 from src.application.services.job_orchestrator import JobOrchestrator
@@ -48,28 +51,18 @@ def get_orchestrator() -> JobOrchestrator:
 
 
 def render_jobs_tab(
-    orchestrator: JobOrchestrator, min_rating: float, current_blacklist: list[str]
+    orchestrator: JobOrchestrator,
+    min_rating: float,
+    current_blacklist: list[str],
+    hide_blacklisted_jobs: bool,
 ):
-    """Render the jobs tab content"""
-    # Get filtered jobs dataframe
-    df = orchestrator.get_jobs_dataframe(min_rating=min_rating, apply_blacklist=True)
+    df = orchestrator.get_jobs_dataframe(
+        min_rating=min_rating, apply_blacklist=hide_blacklisted_jobs
+    )
 
-    # Display stats
-    st.header("Overview")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Jobs", len(df))
-    with col2:
-        jobs_with_rating = df["kununu_rating"].notna().sum()
-        st.metric("Jobs with Rating", jobs_with_rating)
-    with col3:
-        st.metric("Blacklisted Companies", len(current_blacklist))
-    with col4:
-        avg_rating = df["kununu_rating"].mean()
-        st.metric("Avg Rating", f"{avg_rating:.2f}" if avg_rating else "N/A")
-
-    # Display jobs table
-    st.header("Job Listings")
+    st.header(
+        f"Job Listings. Total {len(df)}. Rated: {df["kununu_rating"].notna().sum()}"
+    )
 
     if df.empty:
         st.warning("No jobs found matching your criteria.")
@@ -156,34 +149,13 @@ def render_jobs_tab(
 
 
 def render_companies_tab(orchestrator: JobOrchestrator):
-    """Render the companies tab content"""
-    from dataclasses import asdict
-
-    import pandas as pd
-
     companies = orchestrator.companies()
 
-    # Display stats
-    st.header("Overview")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Companies", len(companies))
-    with col2:
-        companies_with_rating = sum(
-            1 for c in companies if c.kununu_rating and c.kununu_rating > 0
-        )
-        st.metric("With Rating", companies_with_rating)
-    with col3:
-        avg_rating = (
-            sum(c.kununu_rating for c in companies if c.kununu_rating)
-            / companies_with_rating
-            if companies_with_rating > 0
-            else 0
-        )
-        st.metric("Avg Rating", f"{avg_rating:.2f}" if avg_rating else "N/A")
-
-    # Display companies table
-    st.header("Company List")
+    st.header(
+        f"Company List. Total {len(companies)}. Rated {sum(
+        1 for c in companies if c.kununu_rating and c.kununu_rating > 0
+    )}"
+    )
 
     if not companies:
         st.warning("No companies found.")
@@ -216,7 +188,7 @@ def render_companies_tab(orchestrator: JobOrchestrator):
         # Format the dataframe
         st.dataframe(
             df_display,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             column_config={
                 "name": st.column_config.TextColumn("Company Name", width="large"),
@@ -235,7 +207,6 @@ def render_companies_tab(orchestrator: JobOrchestrator):
 
 def main():
     st.set_page_config(page_title="Job Search Dashboard", layout="wide")
-    st.title("Job Search Dashboard")
 
     orchestrator = get_orchestrator()
 
@@ -250,6 +221,13 @@ def main():
         value=4.0,
         step=0.1,
         help="Filter jobs by minimum company rating (0 = show all)",
+    )
+
+    # Toggle for hiding blacklisted jobs
+    hide_blacklisted_jobs = st.sidebar.toggle(
+        "Hide Blacklisted Jobs",
+        value=True,
+        help="When enabled, jobs marked as 'Hide' will be hidden from the list",
     )
 
     # Blacklist management
@@ -287,7 +265,9 @@ def main():
     tab1, tab2 = st.tabs(["📋 Jobs", "🏢 Companies"])
 
     with tab1:
-        render_jobs_tab(orchestrator, min_rating, current_blacklist)
+        render_jobs_tab(
+            orchestrator, min_rating, current_blacklist, hide_blacklisted_jobs
+        )
 
     with tab2:
         render_companies_tab(orchestrator)

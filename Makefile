@@ -8,7 +8,7 @@ streamlit:
 
 
 scrape_jobs:
-	uv run src/jobspy_poc.py
+	uv run python -m src.main
 
 
 
