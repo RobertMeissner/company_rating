@@ -20,7 +20,7 @@ class JobCommandFileBasedAdapter:
         pass
 
     def write(self, jobs: list[Job]):
-        with open(self.filepath, "w", encoding="utf-8") as f:
+        with open(self.filepath, "a", encoding="utf-8") as f:
             for job in jobs:
                 job_dict = JobDict(
                     job_id=job.job_id,

@@ -1,7 +1,6 @@
 <template>
   <v-container fluid class="pa-0">
     <v-row no-gutters>
-      \\Sidebar
       <v-col cols="12" md="3" lg="2">
         <v-card class="sidebar-card" elevation="0">
           <v-card-title class="text-h6">Filters</v-card-title>
@@ -48,24 +47,7 @@
       </v-col>
 
       <v-col cols="12" md="9" lg="10">
-        <v-alert
-          v-if="!hideBlacklisted && blacklistedJobIds.size > 0"
-          type="info"
-          variant="tonal"
-          class="mb-4"
-        >
-          {{ blacklistedJobIds.size }} hidden job(s) visible. Click "Show" to unhide or enable filter to hide them.
-        </v-alert>
-        <v-alert
-          v-else-if="hideBlacklisted && blacklistedJobIds.size > 0"
-          type="info"
-          variant="tonal"
-          class="mb-4"
-        >
-          {{ blacklistedJobIds.size }} job(s) are hidden. Disable filter to see them.
-        </v-alert>
-
-        <v-data-table
+               <v-data-table
           :headers="headers"
           :items="jobs"
           :loading="loading"
@@ -78,7 +60,7 @@
               <v-toolbar-title>
                 Job Listings
                 <v-chip class="ml-2" size="small" v-if="!loading">
-                  {{ jobs.length }} shown, {{ ratedCount }} rated
+                  {{ jobs.length }} shown, {{ ratedCount }} rated, {{ blacklistedJobIds.size }} hidden
                 </v-chip>
               </v-toolbar-title>
             </v-toolbar>
