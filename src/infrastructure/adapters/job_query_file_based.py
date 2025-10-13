@@ -1,6 +1,5 @@
 import json
 from enum import Enum
-from unittest import case
 
 import pandas as pd
 

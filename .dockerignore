@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# CI/CD
+.github/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Frontend build (when building backend)
+frontend/dist/
+frontend/node_modules/
+
+# Kubernetes & Docker
+k8s/
+docker-compose.yml
+Dockerfile*
+
+# Test files
+tests/
+.pytest_cache/
+.coverage
+htmlcov/

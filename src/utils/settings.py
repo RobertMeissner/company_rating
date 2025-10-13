@@ -8,3 +8,5 @@ FILTERED_JOBS_FILENAME = f"{DATA_FOLDER}/filtered_jobs.csv"
 FILTERED_COMPANIES_FILENAME = f"{DATA_FOLDER}/filtered_companies.csv"
 
 COMPANIES_MISSING_RATING_FILENAME = f"{DATA_FOLDER}/companies_missing_ratings.csv"
+
+SERVICE_NAME = "Company Rating"

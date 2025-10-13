@@ -21,7 +21,7 @@ BEWARE: This is a work in progress to test a number of assumptions. Everything c
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [About](#about)
 - [Features](#features)
@@ -34,7 +34,7 @@ BEWARE: This is a work in progress to test a number of assumptions. Everything c
 - [Project Structure](#project-structure)
 - [Data Files](#data-files)
 
-## 🎯 About
+## About
 
 Company Rating Scraper automates the tedious process of job hunting by:
 - Collecting job postings from multiple sources (LinkedIn, Indeed)
@@ -44,17 +44,17 @@ Company Rating Scraper automates the tedious process of job hunting by:
 
 Built with a clean hexagonal architecture for maintainability and extensibility.
 
-## ✨ Features
+## Features
 
-- 🔍 **Multi-Source Job Scraping** - Automated collection from LinkedIn and Indeed via JobSpy
-- ⭐ **Company Ratings** - Enriches jobs with Kununu ratings and review counts
-- 📊 **Interactive Dashboard** - Streamlit-based UI with real-time filtering
-- 🚫 **Smart Blacklisting** - Hide unwanted companies or individual jobs
-- 🔄 **Alternative Names** - Handle companies with different names across platforms
-- 💾 **File-Based Storage** - Simple JSONL format, no database required
-- 🎨 **Clean Architecture** - Ports & adapters pattern for easy testing and extension
+- Multi-Source Job Scraping - Automated collection from LinkedIn and Indeed via JobSpy
+- Company Ratings - Enriches jobs with Kununu ratings and review counts
+- Interactive Dashboard - Vue 3 + TypeScript frontend for the Company Rating system.
+- Smart Blacklisting - Hide unwanted companies or individual jobs
+- Alternative Names - Handle companies with different names across platforms
+- File-Based Storage - Simple JSONL format, no database required
+- Clean Architecture - Ports & adapters pattern for easy testing and extension
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 
@@ -64,7 +64,6 @@ Built with a clean hexagonal architecture for maintainability and extensibility.
 ### Setup
 
 ```bash
-# Clone the repository
 git clone <repository-url>
 cd CompanyRating
 
@@ -75,7 +74,25 @@ uv sync
 uv run playwright install chromium
 ```
 
-## 📖 Usage
+## Usage
+
+### Start Everything
+
+```bash
+make docker-up
+```
+
+This will:
+- Build both frontend and backend images
+- Start containers with proper networking
+- Mount data directory for persistence
+- Expose services on localhost
+
+### Access the Application
+
+- Frontend: http://localhost:8080
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
 ### Daily Workflow
 
@@ -92,23 +109,6 @@ This performs:
 - Blacklist filtering
 - Deduplication
 - Data persistence to `data/jobs.jsonl`
-
-**2. Launch Dashboard**
-
-```bash
-make streamlit
-```
-
-Access the dashboard at `http://localhost:8501`
-
-### Dashboard
-
-The Streamlit interface provides:
-
-- **Rating Filter**: Adjust minimum Kununu rating threshold via sidebar slider
-- **Company Blacklist**: Multi-select dropdown to hide entire companies
-- **Job Hiding**: Check individual jobs to add them to the blacklist
-- **CSV Export**: Export filtered results for external analysis
 
 ### Alternative Company Names
 
@@ -128,7 +128,7 @@ uv run src/main.py
 uv run src/main.py
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Search Parameters
 
@@ -175,7 +175,7 @@ src/
 └── main.py             # CLI entry point
 ```
 
-## 💾 Data Files
+## Data Files
 
 All data stored in the `data/` directory:
 
@@ -188,7 +188,7 @@ All data stored in the `data/` directory:
 | `companies_missing_ratings.csv` | Manual name correction workflow |
 | `filtered_*.csv` | Exported results |
 
-## 🏗️ Architecture
+## Architecture
 
 Built with **Hexagonal Architecture** (Ports & Adapters):
 
@@ -202,7 +202,7 @@ Benefits:
 - Swappable implementations (file storage → database)
 - Clear separation of concerns
 
-## 📝 Notes
+## Notes
 
 - **Rate Limiting**: Kununu scraper includes 1-5s delays for respectful scraping
 - **Stealth Mode**: Playwright uses anti-detection techniques
