@@ -4,6 +4,7 @@ import pandas as pd
 
 from src.domain.value_objects.company import Company
 from src.utils.settings import COMPANY_FILENAME, DATA_FOLDER
+from src.utils.utils import ensure_file_exists
 
 
 class CompanyQueryFileBasedAdapter:
@@ -17,7 +18,7 @@ class CompanyQueryFileBasedAdapter:
     filepath = f"{DATA_FOLDER}/{COMPANY_FILENAME}"
 
     def __init__(self):
-        pass
+        ensure_file_exists(self.filepath)
 
     def _raw_companies(self) -> list[Company]:
         df = pd.read_csv(f"{DATA_FOLDER}/output.csv")

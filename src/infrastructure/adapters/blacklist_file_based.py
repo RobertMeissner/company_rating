@@ -1,4 +1,4 @@
-from pathlib import Path
+from src.utils.utils import ensure_file_exists
 
 
 class BlacklistFileBasedAdapter:
@@ -9,13 +9,7 @@ class BlacklistFileBasedAdapter:
 
     def __init__(self, filename: str):
         self.filename = filename
-        self._ensure_file_exists()
-
-    def _ensure_file_exists(self) -> None:
-        path = Path(self.filename)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.exists():
-            path.touch()
+        ensure_file_exists(self.filename)
 
     def get(self) -> list[str]:
         with open(self.filename, "r", encoding="utf-8") as f:

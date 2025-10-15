@@ -3,6 +3,7 @@ from dataclasses import asdict
 
 from src.domain.value_objects.company import Company
 from src.utils.settings import COMPANY_FILENAME, DATA_FOLDER
+from src.utils.utils import ensure_file_exists
 
 
 class CompanyCommandFileBasedAdapter:
@@ -16,7 +17,7 @@ class CompanyCommandFileBasedAdapter:
     filepath = f"{DATA_FOLDER}/{COMPANY_FILENAME}"
 
     def __init__(self):
-        pass
+        ensure_file_exists(self.filepath)
 
     def write(self, companies: list[Company]):
         with open(self.filepath, "w", encoding="utf-8") as f:

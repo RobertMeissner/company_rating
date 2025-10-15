@@ -22,6 +22,7 @@ def daily_chore():
     orchestrator = default_orchestrator()
     orchestrator.scrape_jobs()
     orchestrator.deduplicate_jobs()
+    orchestrator.create_missing_companies()  # Create companies from jobs
     orchestrator.write()
 
 

@@ -125,6 +125,40 @@ class JobOrchestrator:
         )
         self.set_jobs(deduplicated_jobs)
 
+    def create_missing_companies(self) -> None:
+        """
+        Create Company entries for companies in jobs that don't exist yet.
+
+        Extracts unique company names from jobs and creates placeholder Company
+        entries for any that aren't already in the companies list.
+        """
+        job_company_names = {
+            job.company_name for job in self.jobs() if job.company_name
+        }
+
+        # Find missing companies
+        missing_companies = []
+        for company_name in job_company_names:
+            if self.company(company_name.lower()) is None:
+                # Create a new Company placeholder
+                new_company = Company(
+                    name=company_name,
+                    location="",
+                    kununu_rating=None,
+                    glassdoor_rating=None,
+                    alternative_names=[],
+                )
+                missing_companies.append(new_company)
+
+        if missing_companies:
+            logger.info(
+                f"Creating {len(missing_companies)} new company entries from jobs"
+            )
+            updated_companies = self.companies() + missing_companies
+            self.set_companies(updated_companies)
+        else:
+            logger.debug("No missing companies to create")
+
     async def _scrape_company(self, company: Company) -> Company:
         """
         Returns the first successful result with a rating.

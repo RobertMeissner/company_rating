@@ -4,6 +4,7 @@ from dataclasses import asdict
 from src.domain.entities.job import Job
 from src.models.job_dict import JobDict
 from src.utils.settings import DATA_FOLDER, JOB_FILENAME
+from src.utils.utils import ensure_file_exists
 
 
 class JobCommandFileBasedAdapter:
@@ -17,7 +18,7 @@ class JobCommandFileBasedAdapter:
     filepath = f"{DATA_FOLDER}/{JOB_FILENAME}"
 
     def __init__(self):
-        pass
+        ensure_file_exists(self.filepath)
 
     def write(self, jobs: list[Job]):
         with open(self.filepath, "a", encoding="utf-8") as f:

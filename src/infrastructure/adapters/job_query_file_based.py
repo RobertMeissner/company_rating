@@ -1,10 +1,15 @@
 import json
 from enum import Enum
+from pathlib import Path
 
 import pandas as pd
 
 from src.domain.entities.job import Job
+from src.utils.logger import get_logger
 from src.utils.settings import DATA_FOLDER, JOB_FILENAME
+from src.utils.utils import ensure_file_exists
+
+logger = get_logger(__name__)
 
 
 class FileType(Enum):
@@ -22,6 +27,7 @@ class JobQueryFileBasedAdapter:
 
     def __init__(self):
         self._filetype = FileType.JSONL
+        ensure_file_exists(f"{DATA_FOLDER}/{JOB_FILENAME}")
 
     def get(self) -> list[Job]:
         match self._filetype:
@@ -34,8 +40,17 @@ class JobQueryFileBasedAdapter:
         return jobs
 
     def _read_csv(self) -> list[Job]:
-        df = pd.read_csv(f"{DATA_FOLDER}/jobs.csv")
+        filepath = f"{DATA_FOLDER}/jobs.csv"
         jobs = []
+
+        # CSV files are not auto-created, only JSONL files
+        if not Path(filepath).exists():
+            logger.warning(
+                f"Jobs CSV file not found: {filepath}. Starting with empty list."
+            )
+            return jobs
+
+        df = pd.read_csv(filepath)
         for index, row in df.iterrows():
             # Prefer job_url_direct, fall back to job_url if not available
             url = (
