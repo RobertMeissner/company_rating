@@ -1,23 +1,34 @@
+## Local Development
+.PHONY: dev
+dev:
+	@echo "Starting development servers with hot reload..."
+	@echo "Backend: http://localhost:8000"
+	@echo "Frontend: http://localhost:5173"
+	@$(MAKE) -j2 api frontend
 
+.PHONY: api
+api:
+	uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+
+.PHONY: node
+node:
+	. ${HOME}/.nvm/nvm.sh use node
+
+.PHONY: frontend
+frontend: node
+	cd frontend && bun run dev
+
+frontend-install: node
+	cd frontend && bun install
+
+## Production
 .PHONY: daily
 daily:
 	uv run python -m src.main daily
 
-streamlit:
-	uv run streamlit run src/presentation/streamlit_app.py
-
-api:
-	uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
-
-.PHONY: frontend
-frontend:
-	cd frontend && npm run dev
-
-frontend-install:
-	cd frontend && npm install
-
-scrape_jobs:
-	uv run python -m src.main
+## Docker
+.PHONY: docker
+docker: docker-down docker-build docker-up
 
 # Docker Compose
 docker-up:
@@ -33,7 +44,6 @@ docker-build:
 	docker build -t company-rating-backend:latest -f Dockerfile.backend .
 
 ## Dev tooling
-
 match_with_raw_company_names:
 	uv run src/poc/match_company_names.py
 

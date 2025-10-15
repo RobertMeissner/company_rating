@@ -13,6 +13,7 @@ from src.domain.ports.job_command_port import JobCommandPort
 from src.domain.ports.job_query_port import JobQueryPort
 from src.domain.ports.job_scraper_port import JobScraper
 from src.domain.value_objects.company import Company
+from src.models.job_dict import JobDict
 from src.utils.company_name_normalizer import normalized_company_name
 from src.utils.settings import FILTERED_COMPANIES_FILENAME, FILTERED_JOBS_FILENAME
 
@@ -190,6 +191,62 @@ class JobOrchestrator:
         df.to_csv(FILTERED_COMPANIES_FILENAME)
         df = pd.DataFrame([asdict(c) for c in self.jobs()])
         df.to_csv(FILTERED_JOBS_FILENAME)
+
+    def get_jobs_dataframe(
+        self, min_rating: float = 0.0, apply_blacklist: bool = True
+    ) -> pd.DataFrame:
+        self.deduplicate_jobs()
+        jobs_df = pd.DataFrame(
+            [
+                asdict(
+                    JobDict(
+                        job_id=job.job_id,
+                        url=job.url,
+                        company_name=job.company_name,
+                        working_model=job.working_model,
+                        salary=job.salary,
+                        title=job.title,
+                    )
+                )
+                for job in self.jobs()
+            ]
+        )
+
+        companies_df = pd.DataFrame([asdict(c) for c in self.companies()])
+
+        if jobs_df.empty:
+            return pd.DataFrame()
+
+        merged = pd.merge(
+            jobs_df,
+            companies_df[
+                [
+                    "name",
+                    "kununu_rating",
+                    "kununu_review_count",
+                    "glassdoor_rating",
+                    "glassdoor_review_count",
+                    "location",
+                ]
+            ],
+            left_on="company_name",
+            right_on="name",
+            how="left",
+        ).drop(
+            "name", axis=1
+        )  # Remove duplicate 'name' column
+
+        if apply_blacklist:
+            merged = merged[~merged["company_name"].isin(self.company_blacklist())]
+            merged = merged[~merged["job_id"].isin(self.job_blacklist())]
+
+        if min_rating > 0.0:
+            merged = merged[
+                (merged["kununu_rating"] >= min_rating)
+                | (merged["kununu_rating"].isna())
+            ]
+
+        return merged
 
     def company_blacklist(self):
         return self._blacklist(self._company_blacklist_port)

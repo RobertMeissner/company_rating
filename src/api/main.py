@@ -6,10 +6,13 @@ from src.utils.settings import SERVICE_NAME
 
 app = FastAPI(title=f"{SERVICE_NAME} API", version="1.0.0")
 
-# Configure CORS for local hosting only
+# Configure CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:8080",  # Docker frontend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
