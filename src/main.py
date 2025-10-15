@@ -24,24 +24,20 @@ def daily_chore():
 
 
 @app.command(name="export")
-def export_companies_without_ratings():
+def export_companies_without_ratings() -> None:
     """
     Export companies without ratings.
     """
     orchestrator = default_orchestrator()
     companies_without_ratings = [
         {"company_name": c.name, "alternative_name": c.alternative_names}
-        for c in orchestrator.companies()
-        if (
-            c.alternative_names
-            and c.alternative_names[0] != "void"
-            and c.kununu_rating is None
-        )
-        or (not c.alternative_names and c.kununu_rating is None)
+        for c in orchestrator.companies_needing_scraping()
     ]
 
-    df = pd.DataFrame(companies_without_ratings)
-    df.to_csv(COMPANIES_MISSING_RATING_FILENAME, index=False)
+    pd.DataFrame(companies_without_ratings).to_csv(
+        COMPANIES_MISSING_RATING_FILENAME, index=False
+    )
+    typer.echo("Export done")
 
 
 @app.command(name="import")
@@ -70,27 +66,36 @@ def import_companies():
 
     orchestrator.set_companies(updated_companies)
     orchestrator.write()
+    typer.echo("Import done")
 
 
 @app.command(name="rescrape")
+def rescrape_company(name: str) -> None:
+    """
+    Rescrape one company
+    """
+    orchestrator = default_orchestrator()
+
+    company = orchestrator.company(name)
+    if company:
+        orchestrator.update(company)
+        typer.echo(f"Rescraping {name} done.")
+    else:
+        typer.echo(f"Rescraping {name} failed. Company not found.")
+
+
+@app.command(name="rescrape_all")
 def rescrape_companies():
     """
     Rescrape companies without ratings
     """
     orchestrator = default_orchestrator()
 
-    companies_to_scrape = [
-        c for c in orchestrator.companies() if c.kununu_rating is None
-    ]
+    orchestrator.update_companies_incremental(
+        [c for c in orchestrator.companies_needing_scraping()]
+    )
 
-    if companies_to_scrape:
-        orchestrator.update_companies_incremental(
-            companies_to_scrape, show_progress=True
-        )
-    else:
-        print("No companies to scrape")
-
-    # orchestrator.write()
+    typer.echo("Rescrape done")
 
 
 if __name__ == "__main__":

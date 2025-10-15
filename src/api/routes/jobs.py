@@ -54,6 +54,5 @@ async def get_jobs(
 async def scrape_jobs(orchestrator: JobOrchestrator = Depends(default_orchestrator)):
     jobs = orchestrator.scrape_jobs()
     orchestrator.deduplicate_jobs()
-    orchestrator.filter_blacklisted_jobs()
     orchestrator.write()
     return {"message": f"Scraped {len(jobs)} jobs", "total": len(jobs)}

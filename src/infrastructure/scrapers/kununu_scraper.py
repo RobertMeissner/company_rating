@@ -11,7 +11,7 @@ from src.models.scraper_model import SCRAPERS, ScraperModel
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -109,10 +109,10 @@ class KununuScraper:
             )
 
             self.page = await context.new_page()
-            logger.info("Browser started successfully")
+            logger.debug("Browser started successfully")
 
         except Exception as e:
-            logger.error(f"Failed to start browser: {e}")
+            logger.debug(f"Failed to start browser: {e}")
             raise
 
     async def close_browser(self):

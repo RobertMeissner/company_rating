@@ -75,10 +75,10 @@ class CompanyScraperManager:
         for i, scraper in enumerate(self.scrapers):
             scraper_name = self.scraper_factories[i].__name__
             try:
-                logger.info(f"Running {scraper_name} for {company_name}")
+                logger.debug(f"Running {scraper_name} for {company_name}")
                 result = await scraper.update(company_name)
                 results.append((scraper_name, result))
-                logger.info(
+                logger.debug(
                     f"{scraper_name} completed: "
                     f"kununu={result.kununu_rating}, glassdoor={result.glassdoor_rating}"
                 )

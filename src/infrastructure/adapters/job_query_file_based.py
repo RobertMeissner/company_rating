@@ -24,7 +24,6 @@ class JobQueryFileBasedAdapter:
         self._filetype = FileType.JSONL
 
     def get(self) -> list[Job]:
-        print(self._filetype)
         match self._filetype:
             case FileType.CSV:
                 jobs = self._read_csv()

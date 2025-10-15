@@ -54,7 +54,8 @@ def normalized_company_name(company: Company) -> list[str]:
     :return: list of possible names for scraping
     """
     names_to_try = set()
-    names_to_try.update(company.alternative_names)
+    if company.alternative_names:
+        names_to_try.update(company.alternative_names)
     names_to_try.add(normalize(company.name))
 
     return list(names_to_try)

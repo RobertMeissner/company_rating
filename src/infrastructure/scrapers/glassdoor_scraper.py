@@ -90,7 +90,7 @@ class GlassdoorScraper:
             )
 
             self.page = await context.new_page()
-            logger.info("Browser started successfully")
+            logger.debug("Browser started successfully")
 
         except Exception as e:
             logger.error(f"Failed to start browser: {e}")

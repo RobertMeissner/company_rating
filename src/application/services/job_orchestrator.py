@@ -58,6 +58,21 @@ class JobOrchestrator:
             self.set_companies(self._company_query_port.get())
         return self._companies
 
+    def company(self, company_name: str) -> Company | None:
+        for company in self.companies():
+            if company_name == company.name:
+                return company
+
+            # more complicated, names could be similar, but need normalization
+            seeking = normalized_company_name(Company(name=company_name))[0]
+            current = normalized_company_name(company)[0]
+            if current == seeking:
+                return company
+        return None
+
+    def companies_needing_scraping(self) -> list[Company]:
+        return [c for c in self.companies() if c.kununu_rating is None]
+
     def set_companies(self, companies: list[Company]):
         self._companies = companies
 
@@ -110,15 +125,6 @@ class JobOrchestrator:
             f"Before #jobs: {len(self.jobs())}. After dedup url's #jobs: {len(deduplicated_jobs)}"
         )
         self._jobs = deduplicated_jobs
-
-    def filter_blacklisted_jobs(self):
-        """Remove jobs that are in the blacklist"""
-        before_count = len(self._jobs)
-        if blacklist := self.job_blacklist():
-            self.set_jobs([job for job in self._jobs if job.job_id not in blacklist])
-        print(
-            f"Filtered {before_count - len(self._jobs)} blacklisted jobs. Remaining: {len(self._jobs)}"
-        )
 
     async def _scrape_company(self, company: Company) -> Company:
         """
@@ -264,17 +270,13 @@ class JobOrchestrator:
         return port.get()
 
     def add_to_blacklist(self, company_name: str) -> None:
-        if self._company_blacklist_port:
-            self._company_blacklist_port.add(company_name)
+        self._company_blacklist_port.add(company_name)
 
     def remove_from_blacklist(self, company_name: str) -> None:
-        if self._company_blacklist_port:
-            self._company_blacklist_port.remove(company_name)
+        self._company_blacklist_port.remove(company_name)
 
     def add_to_job_blacklist(self, job_id: str) -> None:
-        if self._job_blacklist_port:
-            self._job_blacklist_port.add(job_id)
+        self._job_blacklist_port.add(job_id)
 
     def remove_from_job_blacklist(self, job_id: str) -> None:
-        if self._job_blacklist_port:
-            self._job_blacklist_port.remove(job_id)
+        self._job_blacklist_port.remove(job_id)
