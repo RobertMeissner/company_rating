@@ -4,9 +4,12 @@ import pandas as pd
 import typer
 
 from src.application.factories.default_orchestrator import default_orchestrator
+from src.utils.logger import get_logger
 from src.utils.settings import (
     COMPANIES_MISSING_RATING_FILENAME,
 )
+
+logger = get_logger(__name__)
 
 app = typer.Typer()
 
@@ -18,7 +21,6 @@ def daily_chore():
     """
     orchestrator = default_orchestrator()
     orchestrator.scrape_jobs()
-    orchestrator.filter_blacklisted_jobs()
     orchestrator.deduplicate_jobs()
     orchestrator.write()
 
@@ -60,7 +62,7 @@ def import_companies():
                 company, alternative_names=[alternatives[company.name]]
             )
             updated_companies.append(updated_company)
-            print(f"Updated {company.name} -> {alternatives[company.name]}")
+            logger.info(f"Updated {company.name} -> {alternatives[company.name]}")
         else:
             updated_companies.append(company)
 

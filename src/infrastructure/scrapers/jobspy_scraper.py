@@ -1,7 +1,11 @@
 import pandas as pd
 from jobspy import scrape_jobs
+from tqdm import tqdm
 
 from src.domain.entities.job import Job
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class JobspyScraper:
@@ -144,25 +148,51 @@ class JobspyScraper:
     def jobs(self) -> list[Job]:
         if not self._jobs:
             found_jobs = []
-            for search_term in self.search_terms:
-                # not available in Europe: "zip_recruiter", bugs:  "bdjobs"
-                for site in ["linkedin", "indeed"]:
-                    print(f"Scraping {site}")
-                    df_jobs = scrape_jobs(
-                        site_name=site,
-                        search_term=search_term,
-                        google_search_term="AI engineer jobs near Münster, since last week",
-                        location="Münster",
-                        results_wanted=100,
-                        hours_old=24 * 7,
-                        country_indeed="germany",
-                        linkedin_fetch_description=True,  # gets more info such as description, direct job url (slower)
-                        # proxies=["208.195.175.46:65095", "208.195.175.45:65095", "localhost"],
-                    )
-                    print(f"Found {len(df_jobs)} jobs")
 
-                    found_jobs.extend(
-                        [self._job_from_row(row) for row in df_jobs.itertuples()]
-                    )
+            # Create list of all scraping tasks
+            sites = ["linkedin", "indeed"]
+            total_tasks = len(self.search_terms) * len(sites)
+
+            # Progress bar for overall scraping progress
+            pbar = tqdm(
+                total=total_tasks,
+                desc="Scraping job boards",
+                unit="search",
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+            )
+
+            for search_term in self.search_terms:
+                for site in sites:
+                    # Update progress bar with current task
+                    pbar.set_description(f"Scraping {site.capitalize()}: {search_term}")
+
+                    try:
+                        df_jobs = scrape_jobs(
+                            site_name=site,
+                            search_term=search_term,
+                            google_search_term="AI engineer jobs near Münster, since last week",
+                            location="Münster",
+                            results_wanted=100,
+                            hours_old=24 * 7,
+                            country_indeed="germany",
+                            linkedin_fetch_description=True,
+                            # proxies=["208.195.175.46:65095", "208.195.175.45:65095", "localhost"],
+                        )
+
+                        jobs_found = len(df_jobs)
+                        pbar.set_postfix_str(
+                            f"Found {jobs_found} jobs | Total: {len(found_jobs)}"
+                        )
+
+                        found_jobs.extend(
+                            [self._job_from_row(row) for row in df_jobs.itertuples()]
+                        )
+                    except Exception as e:
+                        pbar.set_postfix_str(f"Error: {str(e)[:40]}")
+                    finally:
+                        pbar.update(1)
+
+            pbar.close()
+            logger.debug(f"Scraping complete! Found {len(found_jobs)} total jobs")
             self._jobs = found_jobs
         return self._jobs

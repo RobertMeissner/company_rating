@@ -15,7 +15,9 @@ from src.domain.ports.job_scraper_port import JobScraper
 from src.domain.value_objects.company import Company
 from src.models.job_dict import JobDict
 from src.utils.company_name_normalizer import normalized_company_name
-from src.utils.settings import FILTERED_COMPANIES_FILENAME, FILTERED_JOBS_FILENAME
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class JobOrchestrator:
@@ -94,37 +96,34 @@ class JobOrchestrator:
                 seen_names.add(name_key)
                 deduplicated_companies.append(company)
 
-        print(f"Before #companies: {len(self.companies())}")
-        print(f"After deduplication #companies: {len(deduplicated_companies)}")
-        self._companies = deduplicated_companies
+        logger.debug(f"Before deduplication: {len(self.companies())} companies")
+        logger.info(f"After deduplication: {len(deduplicated_companies)} companies")
+        self.set_companies(deduplicated_companies)
 
     def deduplicate_jobs(self):
-
+        initial_jobs = self.jobs()
         # dedup by job_id
         seen_ids = set()
         deduplicated_jobs = []
-        for job in self.jobs():
+        for job in initial_jobs:
             if job.job_id not in seen_ids:
                 seen_ids.add(job.job_id)
                 deduplicated_jobs.append(job)
 
-        print(
-            f"Before #jobs: {len(self.jobs())}. After dedup id's #jobs: {len(deduplicated_jobs)}"
-        )
-        self._jobs = deduplicated_jobs
+        intermediate_jobs = deduplicated_jobs
 
         # dedup by url
         seen_urls = set()
         deduplicated_jobs = []
-        for job in self._jobs:
+        for job in intermediate_jobs:
             if job.url not in seen_urls:
                 seen_urls.add(job.url)
                 deduplicated_jobs.append(job)
 
-        print(
-            f"Before #jobs: {len(self.jobs())}. After dedup url's #jobs: {len(deduplicated_jobs)}"
+        logger.debug(
+            f"Jobs deduplication: {len(initial_jobs)} -> {len(deduplicated_jobs)}"
         )
-        self._jobs = deduplicated_jobs
+        self.set_jobs(deduplicated_jobs)
 
     async def _scrape_company(self, company: Company) -> Company:
         """
@@ -147,21 +146,18 @@ class JobOrchestrator:
                 # Keep the last one, if nothing else is found
                 updated_company = result
 
-            return replace(updated_company, name=company.name)
+            return scraper.merge(
+                existing=company, scraped=replace(updated_company, name=company.name)
+            )
 
     def update(self, company: Company) -> None:
         """
         Scrape a single company.
         """
-        scraped_data = asyncio.run(self._scrape_company(company))
-
-        merged_company = self._company_scraper_port._merge_company_data(
-            company, scraped_data
-        )
+        scraped_company = asyncio.run(self._scrape_company(company))
         company_map = {c.name: c for c in self.companies()}
-        company_map[company.name] = merged_company
+        company_map[company.name] = scraped_company
         self.set_companies(list(company_map.values()))
-
         self.write()
 
     def update_companies_incremental(self, companies: list[Company]) -> list[Company]:
@@ -187,16 +183,10 @@ class JobOrchestrator:
                     f"Rating: {updated.kununu_rating or 'N/A'}"
                 )
             except Exception as e:
-                print(f"Error scraping {company.name}: {e}")
+                logger.error(f"Error scraping {company.name}: {e}")
                 updated_companies.append(company)  # Keep original if scraping fails
 
         return updated_companies
-
-    def export_to_csv(self):
-        df = pd.DataFrame([asdict(c) for c in self.companies()])
-        df.to_csv(FILTERED_COMPANIES_FILENAME)
-        df = pd.DataFrame([asdict(c) for c in self.jobs()])
-        df.to_csv(FILTERED_JOBS_FILENAME)
 
     def get_jobs_dataframe(
         self, min_rating: float = 0.0, apply_blacklist: bool = True

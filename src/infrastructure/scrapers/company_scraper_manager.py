@@ -192,3 +192,6 @@ class CompanyScraperManager:
         )
 
         return Company(**merged)
+
+    def merge(self, existing: Company, scraped: Company) -> Company:
+        return self._merge_company_data(existing, scraped)
