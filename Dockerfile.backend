@@ -15,7 +15,8 @@ RUN uv pip install --system --no-cache \
     pandas>=2.2.0 \
     playwright>=1.55.0 \
     python-jobspy>=1.1.82 \
-    uvicorn>=0.34.0
+    uvicorn>=0.34.0 \
+    "tqdm>=4.66.0"
 
 COPY src/ ./src/
 COPY data/ ./data/

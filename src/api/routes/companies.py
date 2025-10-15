@@ -1,8 +1,8 @@
 import pandas as pd
 from fastapi import APIRouter, Depends
 
-from src.api.dependencies import api_job_orchestrator
 from src.api.models.schemas import CompanyListResponse, CompanyResponse
+from src.application.factories.default_orchestrator import default_orchestrator
 from src.application.services.job_orchestrator import JobOrchestrator
 from src.utils.utils import nan_to_none
 
@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/companies", response_model=CompanyListResponse)
-async def get_companies(orchestrator: JobOrchestrator = Depends(api_job_orchestrator)):
+async def get_companies(orchestrator: JobOrchestrator = Depends(default_orchestrator)):
 
     company_responses = []
     for company in orchestrator.companies():

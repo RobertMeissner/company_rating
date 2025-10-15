@@ -3,8 +3,8 @@ from typing import Optional
 import pandas as pd
 from fastapi import APIRouter, Depends, Query
 
-from src.api.dependencies import api_job_orchestrator
 from src.api.models.schemas import JobListResponse, JobResponse
+from src.application.factories.default_orchestrator import default_orchestrator
 from src.application.services.job_orchestrator import JobOrchestrator
 from src.utils.utils import nan_to_none
 
@@ -15,7 +15,7 @@ router = APIRouter()
 async def get_jobs(
     min_rating: Optional[float] = Query(default=0.0, ge=0.0, le=5.0),
     apply_blacklist: bool = Query(default=True),
-    orchestrator: JobOrchestrator = Depends(api_job_orchestrator),
+    orchestrator: JobOrchestrator = Depends(default_orchestrator),
 ):
     df = orchestrator.get_jobs_dataframe(
         min_rating=min_rating, apply_blacklist=apply_blacklist
@@ -51,7 +51,7 @@ async def get_jobs(
 
 
 @router.post("/jobs/scrape")
-async def scrape_jobs(orchestrator: JobOrchestrator = Depends(api_job_orchestrator)):
+async def scrape_jobs(orchestrator: JobOrchestrator = Depends(default_orchestrator)):
     jobs = orchestrator.scrape_jobs()
     orchestrator.deduplicate_jobs()
     orchestrator.filter_blacklisted_jobs()

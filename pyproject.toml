@@ -11,15 +11,27 @@ dependencies = [
     "playwright>=1.55.0",
     "pre-commit>=4.3.0",
     "python-jobspy>=1.1.82",
+    "tqdm>=4.66.0",
+    "typer>=0.19.2",
     "uvicorn>=0.34.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    "python-call-graph>=2.1.6",
     "streamlit>=1.50.0",
+    "ty>=0.0.1a22",
 ]
 
 [tool.isort]
 profile = "black"
 src_paths = ["src", "test"]
+
+[tool.vulture]
+exclude = ["*file*.py", "dir/"]
+ignore_decorators = ["@app.route", "@require_*"]
+ignore_names = ["visit_*", "do_*"]
+paths = ["src"]
+sort_by_size = true
+verbose = true

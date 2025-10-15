@@ -1,19 +1,19 @@
 import asyncio
-from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import pandas as pd
+from tqdm import tqdm
 
 from src.domain.entities.job import Job
 from src.domain.ports.blacklist_port import BlacklistPort
 from src.domain.ports.company_command_port import CompanyCommandPort
 from src.domain.ports.company_query_port import CompanyQueryPort
-from src.domain.ports.company_scraper_port import CompanyScraper
+from src.domain.ports.company_scraper_port import CompanyScraperPort
 from src.domain.ports.job_command_port import JobCommandPort
 from src.domain.ports.job_query_port import JobQueryPort
 from src.domain.ports.job_scraper_port import JobScraper
 from src.domain.value_objects.company import Company
-from src.models.job_dict import JobDict
+from src.utils.company_name_normalizer import normalized_company_name
 from src.utils.settings import FILTERED_COMPANIES_FILENAME, FILTERED_JOBS_FILENAME
 
 
@@ -27,7 +27,7 @@ class JobOrchestrator:
         job_command_port: JobCommandPort,
         company_query_port: CompanyQueryPort,
         company_command_port: CompanyCommandPort,
-        company_scraper: Callable[[], CompanyScraper],
+        company_scraper: CompanyScraperPort,
         job_scraper_port: JobScraper,
         company_blacklist_port: BlacklistPort,
         job_blacklist_port: BlacklistPort,
@@ -43,17 +43,18 @@ class JobOrchestrator:
 
     def jobs(self) -> list[Job]:
         if not self._jobs:
-            self._jobs = self._job_query_port.get()
-
+            self.set_jobs(self._job_query_port.get())
         return self._jobs
 
-    def scrape_jobs(self) -> list[Job]:
-        self._jobs = self._job_scraper_port.jobs()
-        return self._jobs
+    def set_jobs(self, jobs: list[Job]):
+        self._jobs = jobs
+
+    def scrape_jobs(self) -> None:
+        self.set_jobs(self._job_scraper_port.jobs())
 
     def companies(self) -> list[Company]:
         if not self._companies:
-            self._companies = self._company_query_port.get()
+            self.set_companies(self._company_query_port.get())
         return self._companies
 
     def set_companies(self, companies: list[Company]):
@@ -111,103 +112,84 @@ class JobOrchestrator:
 
     def filter_blacklisted_jobs(self):
         """Remove jobs that are in the blacklist"""
-        blacklist = self.job_blacklist()
-        if not blacklist:
-            print("No jobs in blacklist, skipping filter")
-            return
-
         before_count = len(self._jobs)
-        self._jobs = [job for job in self._jobs if job.job_id not in blacklist]
-        filtered_count = before_count - len(self._jobs)
-
+        if blacklist := self.job_blacklist():
+            self.set_jobs([job for job in self._jobs if job.job_id not in blacklist])
         print(
-            f"Filtered {filtered_count} blacklisted jobs. Remaining: {len(self._jobs)}"
+            f"Filtered {before_count - len(self._jobs)} blacklisted jobs. Remaining: {len(self._jobs)}"
         )
 
-    async def _scrape(self, companies: list[Company]) -> list[Company]:
+    async def _scrape_company(self, company: Company) -> Company:
+        """
+        Returns the first successful result with a rating.
+        """
+        async with self._company_scraper_port as scraper:
+            updated_company = None
 
+            # Try each name variation until we get a rating
+            for name_to_scrape in normalized_company_name(company):
+                result: Company = await scraper.update(name_to_scrape)
+
+                rating = result.kununu_rating or result.glassdoor_rating
+                if rating and rating > 0:
+                    updated_company = replace(
+                        result, alternative_names=[name_to_scrape]
+                    )
+                    break
+
+                # Keep the last one, if nothing else is found
+                updated_company = result
+
+            return replace(updated_company, name=company.name)
+
+    def update(self, company: Company) -> None:
+        """
+        Scrape a single company.
+        """
+        scraped_data = asyncio.run(self._scrape_company(company))
+
+        merged_company = self._company_scraper_port._merge_company_data(
+            company, scraped_data
+        )
+        company_map = {c.name: c for c in self.companies()}
+        company_map[company.name] = merged_company
+        self.set_companies(list(company_map.values()))
+
+        self.write()
+
+    def update_companies_incremental(self, companies: list[Company]) -> list[Company]:
+        """
+        Update multiple companies one at a time with immediate persistence.
+
+        Args:
+            companies: List of companies to scrape
+
+        Returns:
+            List of updated companies
+        """
         updated_companies = []
-        async with self._company_scraper_port() as scraper:
-            for company in companies:
-                # Prefer alternative name if available, otherwise use company name
-                name_to_scrape = (
-                    company.alternative_names[0]
-                    if company.alternative_names
-                    else company.name.replace(" ", "-")
-                )
-                updated_company = await scraper.update(name_to_scrape)
-                print(updated_company)
-                updated_companies.append(updated_company)
-        return updated_companies
 
-    def update_companies(self):
-        self._companies = asyncio.run(self._scrape(self.companies()))
+        pbar = tqdm(companies, desc="Scraping companies", unit="company")
+        for company in pbar:
+            try:
+                updated = self.update(company)
+                updated_companies.append(updated)
+
+                pbar.set_postfix_str(
+                    f"Last: {company.name[:30]}... "
+                    f"Rating: {updated.kununu_rating or 'N/A'}"
+                )
+            except Exception as e:
+                print(f"Error scraping {company.name}: {e}")
+                updated_companies.append(company)  # Keep original if scraping fails
+
+        return updated_companies
 
     def export_to_csv(self):
         df = pd.DataFrame([asdict(c) for c in self.companies()])
         df.to_csv(FILTERED_COMPANIES_FILENAME)
         df = pd.DataFrame([asdict(c) for c in self.jobs()])
         df.to_csv(FILTERED_JOBS_FILENAME)
-
-    def get_jobs_dataframe(
-        self, min_rating: float = 0.0, apply_blacklist: bool = True
-    ) -> pd.DataFrame:
-        self.deduplicate_jobs()
-        jobs_df = pd.DataFrame(
-            [
-                asdict(
-                    JobDict(
-                        job_id=job.job_id,
-                        url=job.url,
-                        company_name=job.company_name,
-                        working_model=job.working_model,
-                        salary=job.salary,
-                        title=job.title,
-                    )
-                )
-                for job in self.jobs()
-            ]
-        )
-        companies_df = pd.DataFrame([asdict(c) for c in self.companies()])
-
-        if jobs_df.empty:
-            return pd.DataFrame()
-
-        merged = pd.merge(
-            jobs_df,
-            companies_df[
-                [
-                    "name",
-                    "kununu_rating",
-                    "kununu_review_count",
-                    "glassdoor_rating",
-                    "glassdoor_review_count",
-                    "location",
-                ]
-            ],
-            left_on="company_name",
-            right_on="name",
-            how="left",
-        ).drop(
-            "name", axis=1
-        )  # Remove duplicate 'name' column
-
-        if apply_blacklist:
-            company_blacklist = self._blacklist(self._company_blacklist_port)
-            if company_blacklist:
-                merged = merged[~merged["company_name"].isin(company_blacklist)]
-
-            job_blacklist = self._blacklist(self._job_blacklist_port)
-            if job_blacklist:
-                merged = merged[~merged["job_id"].isin(job_blacklist)]
-
-        if min_rating > 0.0:
-            merged = merged[
-                (merged["kununu_rating"] >= min_rating)
-                | (merged["kununu_rating"].isna())
-            ]
-
-        return merged
 
     def company_blacklist(self):
         return self._blacklist(self._company_blacklist_port)

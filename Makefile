@@ -1,7 +1,7 @@
 
-
-poc-file-resume:
-	@echo "Example: make poc-file-resume FILE=data/companies.txt EXPORT=data/output.csv"
+.PHONY: daily
+daily:
+	uv run python -m src.main daily
 
 streamlit:
 	uv run streamlit run src/presentation/streamlit_app.py
@@ -40,3 +40,12 @@ match_with_raw_company_names:
 .PHONY: pre-comit
 pre-commit:
 	uv run pre-commit run -a
+
+.PHONY: pre-comit
+pre-commit-manual:
+	uv run pre-commit run -a --hook-stage manual
+
+.PHONY: callgraph
+callgraph:
+	# WIP! Output is flaky at best
+	uv run pycallgraph graphviz -- src/main.py
