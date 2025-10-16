@@ -1,3 +1,26 @@
+
+
+## Production
+.PHONY: daily
+daily:
+	uv run python -m src.main daily
+
+.PHONY: export
+export:
+	uv run python -m src.main export
+
+.PHONY: import
+import:
+	uv run python -m src.main import
+
+.PHONY: rescrape_all
+rescrape_all:
+	uv run python -m src.main rescrape_all
+
+.PHONY: rescrape
+rescrape:
+	uv run python -m src.main rescrape "monari GmbH"
+
 ## Local Development
 .PHONY: dev
 dev:
@@ -20,11 +43,6 @@ frontend: node
 
 frontend-install: node
 	cd frontend && bun install
-
-## Production
-.PHONY: daily
-daily:
-	uv run python -m src.main daily
 
 ## Docker
 .PHONY: docker

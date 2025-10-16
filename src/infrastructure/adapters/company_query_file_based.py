@@ -29,7 +29,6 @@ class CompanyQueryFileBasedAdapter:
                 location="",
                 kununu_rating=row["rating"],
                 glassdoor_rating=0,
-                alternative_names=[],
             )
             companies.append(company)
         return companies

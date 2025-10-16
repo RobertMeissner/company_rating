@@ -66,9 +66,10 @@ class JobOrchestrator:
                 return company
 
             # more complicated, names could be similar, but need normalization
-            seeking = normalized_company_name(Company(name=company_name))[0]
-            current = normalized_company_name(company)[0]
-            if current == seeking:
+            seeking_names = normalized_company_name(name=company_name)
+            current_names = normalized_company_name(company.name)
+
+            if current_names == seeking_names:
                 return company
         return None
 
@@ -146,7 +147,7 @@ class JobOrchestrator:
                     location="",
                     kununu_rating=None,
                     glassdoor_rating=None,
-                    alternative_names=[],
+                    scraper_identifiers={},
                 )
                 missing_companies.append(new_company)
 
@@ -159,45 +160,43 @@ class JobOrchestrator:
         else:
             logger.debug("No missing companies to create")
 
-    async def _scrape_company(self, company: Company) -> Company:
+    def _scrape_company(self, company: Company) -> Company:
         """
-        Returns the first successful result with a rating.
+        Rescrapes the company and merges with current one
         """
-        async with self._company_scraper_port as scraper:
-            updated_company = None
+        updated_company: Company = asyncio.run(
+            self._company_scraper_port.update(company)
+        )
 
-            # Try each name variation until we get a rating
-            for name_to_scrape in normalized_company_name(company):
-                result: Company = await scraper.update(name_to_scrape)
+        return self._company_scraper_port.merge(
+            existing=company, scraped=replace(updated_company, name=company.name)
+        )
 
-                rating = result.kununu_rating or result.glassdoor_rating
-                if rating and rating > 0:
-                    updated_company = replace(
-                        result, alternative_names=[name_to_scrape]
-                    )
-                    break
-
-                # Keep the last one, if nothing else is found
-                updated_company = result
-
-            return scraper.merge(
-                existing=company, scraped=replace(updated_company, name=company.name)
-            )
-
-    def update(self, company: Company) -> None:
+    def update(self, company: Company) -> Company:
         """
         Scrape a single company.
+
+        Returns:
+            The updated company with scraped data
         """
-        scraped_company = asyncio.run(self._scrape_company(company))
+        scraped_company = self._scrape_company(company)
         company_map = {c.name: c for c in self.companies()}
-        company_map[company.name] = scraped_company
+
+        # Find existing company to get the correct key (handles name normalization)
+        existing = self.company(company.name)
+        if existing:
+            # Update existing company using its exact name as the key
+            company_map[existing.name] = scraped_company
+        else:
+            # Add new company if it doesn't exist
+            company_map[company.name] = scraped_company
+
         self.set_companies(list(company_map.values()))
         self.write()
+        return scraped_company
 
-    def update_companies_incremental(self, companies: list[Company]) -> list[Company]:
+    def update_companies(self, companies: list[Company]) -> list[Company]:
         """
-        Update multiple companies one at a time with immediate persistence.
-
         Args:
             companies: List of companies to scrape
 

@@ -1,28 +1,77 @@
 import re
 import unicodedata
 
-from src.domain.value_objects.company import Company
-
 PHRASES_TO_REMOVE = [
+    # Branch identifiers
     "- German Branch",
     "German Branch",
     "Deutschland",
     "Germany",
     "(Deutschland)",
     "(Germany)",
+    # German legal forms - GmbH variations
+    "GmbH",
+    "Gmbh",
+    "gmbh",
+    "G.m.b.H.",
+    "G.m.b.H",
+    "mbH",
+    "(GmbH)",
+    "(Gmbh)",
+    "(gmbh)",
+    # GmbH & Co. KG combinations
+    "GmbH & Co. KG",
+    "GmbH & Co KG",
+    "GmbH &Co. KG",
+    "Gmbh & Co. KG",
+    "gmbh & co. kg",
+    "& Co. KG",
+    "& Co KG",
+    # Other German legal forms
+    "AG",
+    "A.G.",
+    "(AG)",
+    "SE",
+    "S.E.",
+    "KG",
+    "K.G.",
+    "OHG",
+    "O.H.G.",
+    "UG",
+    "U.G.",
+    "UG (haftungsbeschränkt)",
+    "e.V.",
+    "e. V.",
+    "eV",
+    # International legal forms
+    "Inc.",
+    "Inc",
+    "LLC",
+    "Ltd.",
+    "Ltd",
+    "Limited",
+    "Corp.",
+    "Corp",
+    "Corporation",
+    "Co.",
+    "Company",
+    # Common prefixes/suffixes
+    "The",
 ]
 
 
-def normalize(name: str) -> str:
+def normalized_company_name(name: str) -> str:
     """
     Normalize company name for comparison/deduplication.
     Returns lowercase, stripped version without special chars.
     """
-    normalized = name.lower().strip()
 
-    # Remove common phrases
+    normalized = name.strip()
+    # Remove common phrases first, in case, e.g. "se" is inside the company name, too
     for phrase in PHRASES_TO_REMOVE:
-        normalized = normalized.replace(phrase.lower(), "")
+        normalized = normalized.replace(phrase, "")
+
+    normalized = normalized.lower().strip()
 
     normalized = (
         unicodedata.normalize("NFKD", normalized)
@@ -44,18 +93,3 @@ def normalize(name: str) -> str:
     normalized = "-".join(normalized.split())
 
     return normalized.strip("-")
-
-
-def normalized_company_name(company: Company) -> list[str]:
-    """
-    Generates multiple company name variations for scraping
-
-    :param company: Company
-    :return: list of possible names for scraping
-    """
-    names_to_try = set()
-    if company.alternative_names:
-        names_to_try.update(company.alternative_names)
-    names_to_try.add(normalize(company.name))
-
-    return list(names_to_try)

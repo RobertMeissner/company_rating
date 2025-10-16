@@ -2,8 +2,11 @@ from dataclasses import replace
 
 import pandas as pd
 import typer
+from pandas.errors import EmptyDataError
 
 from src.application.factories.default_orchestrator import default_orchestrator
+from src.domain.value_objects.company import Company
+from src.models.scraper_model import SCRAPERS
 from src.utils.logger import get_logger
 from src.utils.settings import (
     COMPANIES_MISSING_RATING_FILENAME,
@@ -29,47 +32,98 @@ def daily_chore():
 @app.command(name="export")
 def export_companies_without_ratings() -> None:
     """
-    Export companies without ratings.
+    Export companies without ratings with their scraper identifiers.
     """
     orchestrator = default_orchestrator()
     companies_without_ratings = [
-        {"company_name": c.name, "alternative_name": c.alternative_names}
+        {
+            "company_name": c.name,
+            "kununu_name": c.scraper_identifiers.get(SCRAPERS.KUNUNU.value, ""),
+            "glassdoor_name": c.scraper_identifiers.get(SCRAPERS.GLASSDOOR.value, ""),
+        }
         for c in orchestrator.companies_needing_scraping()
     ]
 
     pd.DataFrame(companies_without_ratings).to_csv(
         COMPANIES_MISSING_RATING_FILENAME, index=False
     )
-    typer.echo("Export done")
+    typer.echo(f"Export done. Exported {len(companies_without_ratings)} companies.")
 
 
 @app.command(name="import")
 def import_companies():
-    """Import companies and add them to the system"""
+    """Import companies with updated scraper identifiers"""
 
     orchestrator = default_orchestrator()
 
-    df = pd.read_csv(COMPANIES_MISSING_RATING_FILENAME)
+    try:
+        df = pd.read_csv(COMPANIES_MISSING_RATING_FILENAME)
+    except EmptyDataError:
+        typer.echo("No missing companies found")
+        return
 
-    alternatives = {}
+    # Build a map of company name to scraper identifiers
+    scraper_identifier_updates = {}
     for _, row in df.iterrows():
-        if pd.notna(row["alternative_name"]) and row["alternative_name"].strip():
-            alternatives[row["company_name"]] = row["alternative_name"].strip()
+        company_name = row["company_name"]
+        scraper_identifiers = {}
 
+        # Add kununu name if provided and different from empty string
+        if pd.notna(row.get("kununu_name")) and str(row["kununu_name"]).strip():
+            scraper_identifiers[SCRAPERS.KUNUNU.value] = str(row["kununu_name"]).strip()
+
+        # Add glassdoor name if provided and different from empty string
+        if pd.notna(row.get("glassdoor_name")) and str(row["glassdoor_name"]).strip():
+            scraper_identifiers[SCRAPERS.GLASSDOOR.value] = str(
+                row["glassdoor_name"]
+            ).strip()
+
+        # Always add to updates map (even if empty scraper_identifiers)
+        scraper_identifier_updates[company_name] = scraper_identifiers
+
+    # Track which companies from CSV were found in existing companies
+    existing_company_names = {c.name for c in orchestrator.companies()}
+    companies_to_create = (
+        set(scraper_identifier_updates.keys()) - existing_company_names
+    )
+
+    # Update existing companies
     updated_companies = []
+    updated_count = 0
     for company in orchestrator.companies():
-        if company.name in alternatives:
-            updated_company = replace(
-                company, alternative_names=[alternatives[company.name]]
-            )
+        if company.name in scraper_identifier_updates:
+            # Merge existing scraper identifiers with new ones
+            updated_identifiers = {
+                **company.scraper_identifiers,
+                **scraper_identifier_updates[company.name],
+            }
+            updated_company = replace(company, scraper_identifiers=updated_identifiers)
             updated_companies.append(updated_company)
-            logger.info(f"Updated {company.name} -> {alternatives[company.name]}")
+            logger.info(
+                f"Updated scraper identifiers for {company.name}: {scraper_identifier_updates[company.name]}"
+            )
+            updated_count += 1
         else:
             updated_companies.append(company)
 
+    # Create new companies from CSV that don't exist yet
+    created_count = 0
+    for company_name in companies_to_create:
+        new_company = Company(
+            name=company_name,
+            scraper_identifiers=scraper_identifier_updates[company_name],
+        )
+        updated_companies.append(new_company)
+        logger.info(
+            f"Created new company: {company_name} with identifiers {scraper_identifier_updates[company_name]}"
+        )
+        created_count += 1
+
     orchestrator.set_companies(updated_companies)
     orchestrator.write()
-    typer.echo("Import done")
+    typer.echo(
+        f"Import done. Updated {updated_count} companies, created {created_count} new companies."
+    )
 
 
 @app.command(name="rescrape")
@@ -93,10 +147,9 @@ def rescrape_companies():
     Rescrape companies without ratings
     """
     orchestrator = default_orchestrator()
-
-    orchestrator.update_companies_incremental(
-        [c for c in orchestrator.companies_needing_scraping()]
-    )
+    companies = orchestrator.update_companies(orchestrator.companies_needing_scraping())
+    orchestrator.set_companies(companies)
+    orchestrator.write()
 
     typer.echo("Rescrape done")
 

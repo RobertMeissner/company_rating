@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+from src.models.scraper_model import SCRAPERS
+
 
 @dataclass(frozen=True)
 class Company:
@@ -31,8 +33,8 @@ class Company:
     founded_year: Optional[int] = None
 
     # URLs and identifiers
-    alternative_names: list[str] = field(
-        default_factory=list
+    scraper_identifiers: dict[str, str] = field(
+        default_factory=lambda: {key.value: "" for key in SCRAPERS}
     )  # in case depending on the platform, it has different names, spellings, ...
     url: str = ""  # Kununu profile URL
     website: str = ""  # Company's actual website

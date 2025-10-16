@@ -2,7 +2,7 @@ import logging
 import sys
 
 
-def get_logger(name: str = __name__, level: int = logging.INFO) -> logging.Logger:
+def get_logger(name: str = __name__, level: int = logging.DEBUG) -> logging.Logger:
     """
     Args:
         name: Logger name (usually __name__)

@@ -7,6 +7,7 @@ from src.infrastructure.scrapers.company_scraper_manager import (
 )
 from src.infrastructure.scrapers.glassdoor_scraper import GlassdoorScraper
 from src.infrastructure.scrapers.kununu_scraper import KununuScraper
+from src.models.scraper_model import SCRAPERS
 
 
 @pytest.fixture
@@ -75,10 +76,10 @@ class TestMergeCombineAll:
     def test_merge_combines_all_fields_from_both_sources(
         self, kununu_company_full, glassdoor_company_full, scraper_manager
     ):
-        results = [
-            ("KununuScraper", kununu_company_full),
-            ("GlassdoorScraper", glassdoor_company_full),
-        ]
+        results = {
+            SCRAPERS.KUNUNU: kununu_company_full,
+            SCRAPERS.GLASSDOOR: glassdoor_company_full,
+        }
 
         merged = scraper_manager._combined_scraper_results("Test Company", results)
 
@@ -109,10 +110,10 @@ class TestMergeCombineAll:
             glassdoor_rating=5.0,  # This shouldn't be used!
         )
 
-        results = [
-            ("KununuScraper", kununu_with_wrong_glassdoor),
-            ("GlassdoorScraper", glassdoor_company_full),
-        ]
+        results = {
+            SCRAPERS.KUNUNU: kununu_with_wrong_glassdoor,
+            SCRAPERS.GLASSDOOR: glassdoor_company_full,
+        }
 
         merged = scraper_manager._combined_scraper_results("Test Company", results)
 
@@ -122,11 +123,10 @@ class TestMergeCombineAll:
     def test_merge_fills_gaps_from_both_sources(
         self, kununu_company_partial, glassdoor_company_partial, scraper_manager
     ):
-
-        results = [
-            ("KununuScraper", kununu_company_partial),
-            ("GlassdoorScraper", glassdoor_company_partial),
-        ]
+        results = {
+            SCRAPERS.KUNUNU: kununu_company_partial,
+            SCRAPERS.GLASSDOOR: glassdoor_company_partial,
+        }
 
         merged = scraper_manager._combined_scraper_results("Test Company", results)
 
@@ -138,11 +138,10 @@ class TestMergeCombineAll:
         assert merged.website == "https://test-company.com"
 
     def test_merge_handles_empty_results(self, empty_company, scraper_manager):
-
-        results = [
-            ("KununuScraper", empty_company),
-            ("GlassdoorScraper", empty_company),
-        ]
+        results = {
+            SCRAPERS.KUNUNU: empty_company,
+            SCRAPERS.GLASSDOOR: empty_company,
+        }
 
         merged = scraper_manager._combined_scraper_results("Test Company", results)
 
@@ -161,10 +160,10 @@ class TestMergeCombineAll:
             industry=None,
         )
 
-        results = [
-            ("KununuScraper", kununu_company_full),
-            ("GlassdoorScraper", empty_glassdoor),
-        ]
+        results = {
+            SCRAPERS.KUNUNU: kununu_company_full,
+            SCRAPERS.GLASSDOOR: empty_glassdoor,
+        }
 
         merged = scraper_manager._combined_scraper_results("Test Company", results)
 
@@ -184,8 +183,7 @@ class TestCreateScraperManager:
 class TestEdgeCases:
 
     def test_merge_with_no_results(self, kununu_company_full, scraper_manager):
-
-        merged = scraper_manager._combined_scraper_results("Test Company", [])
+        merged = scraper_manager._combined_scraper_results("Test Company", {})
 
         assert merged.name == "Test Company"
         assert merged.kununu_rating is None
@@ -193,7 +191,7 @@ class TestEdgeCases:
     def test_merge_with_single_result(self, kununu_company_full, scraper_manager):
         """Should handle merging with only one scraper result"""
 
-        results = [("KununuScraper", kununu_company_full)]
+        results = {SCRAPERS.KUNUNU: kununu_company_full}
 
         merged = scraper_manager._combined_scraper_results("Test Company", results)
 
@@ -206,108 +204,127 @@ class TestEdgeCases:
             kununu_rating=4.0,
         )
 
-        results = [("KununuScraper", wrong_name_company)]
+        results = {SCRAPERS.KUNUNU: wrong_name_company}
 
         merged = scraper_manager._combined_scraper_results("Correct Name", results)
 
         assert merged.name == "Correct Name"
 
     def test_merge_with_alternative_names(self, scraper_manager):
-        """Should handle companies with alternative names"""
+        """Should handle companies with scraper_identifiers"""
 
         company_with_alternatives = Company(
             name="Test Company",
-            alternative_names=["Test Corp", "TC GmbH"],
+            scraper_identifiers={SCRAPERS.KUNUNU.value: "Test Corp"},
             kununu_rating=4.0,
         )
 
-        results = [("KununuScraper", company_with_alternatives)]
+        results = {SCRAPERS.KUNUNU: company_with_alternatives}
 
         merged = scraper_manager._combined_scraper_results("Test Company", results)
 
-        assert merged.alternative_names == ["Test Corp", "TC GmbH"]
+        assert merged.scraper_identifiers == {
+            SCRAPERS.GLASSDOOR.value: "Test Company",
+            SCRAPERS.KUNUNU.value: "Test Company",
+        }
         assert merged.kununu_rating == 4.0
 
 
-class TestAlternativeNameCapture:
-    """Test capturing scraped names as alternative names"""
+class TestScraperIdentifiers:
+    """Test capturing scraped names in scraper_identifiers dict"""
 
-    def test_captures_scraped_name_as_alternative(self, scraper_manager):
-        """Should capture scraped company name as alternative name"""
-        # Scraper returns different name than what we searched for
-        scraped_company = Company(
-            name="SAP SE",  # Different from search term
-            kununu_rating=4.0,
-        )
-
-        results = [("KununuScraper", scraped_company)]
-
-        merged = scraper_manager._combined_scraper_results("SAP", results)
-
-        # Should preserve our name
-        assert merged.name == "SAP"
-        # Should capture scraped name as alternative
-        assert "SAP SE" in merged.alternative_names
-
-    def test_combines_alternative_names_from_multiple_scrapers(self, scraper_manager):
-        """Should combine alternative names from all scrapers"""
+    def test_captures_scraped_names_from_each_scraper(self, scraper_manager):
+        """Should capture company name from each scraper separately"""
         kununu_company = Company(
-            name="SAP-SE",  # Kununu format
+            name="SAP SE",  # Kununu returns this
             kununu_rating=4.0,
-            alternative_names=["SAP GmbH"],
         )
 
         glassdoor_company = Company(
-            name="SAP SE",  # Glassdoor format
+            name="SAP Inc",  # Glassdoor returns this
             glassdoor_rating=3.8,
         )
 
-        results = [
-            ("KununuScraper", kununu_company),
-            ("GlassdoorScraper", glassdoor_company),
-        ]
+        results = {
+            SCRAPERS.KUNUNU: kununu_company,
+            SCRAPERS.GLASSDOOR: glassdoor_company,
+        }
 
         merged = scraper_manager._combined_scraper_results("SAP", results)
 
-        # Should have all unique alternative names
-        assert "SAP-SE" in merged.alternative_names
-        assert "SAP SE" in merged.alternative_names
-        assert "SAP GmbH" in merged.alternative_names
-        assert len(merged.alternative_names) == 3
+        # Should preserve our search name
+        assert merged.name == "SAP"
+        # Should capture each scraper's name separately
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP SE"
+        assert merged.scraper_identifiers[SCRAPERS.GLASSDOOR.value] == "SAP Inc"
+        assert len(merged.scraper_identifiers) == 2
 
-    def test_avoids_duplicate_alternative_names(self, scraper_manager):
-        """Should not add duplicate alternative names"""
+    def test_captures_scraper_identifier_with_single_scraper(self, scraper_manager):
+        """Should handle single scraper result"""
         kununu_company = Company(
             name="SAP SE",
             kununu_rating=4.0,
-            alternative_names=["SAP SE"],  # Already has this name
         )
 
-        glassdoor_company = Company(
-            name="SAP SE",  # Same name again
-            glassdoor_rating=3.8,
-        )
-
-        results = [
-            ("KununuScraper", kununu_company),
-            ("GlassdoorScraper", glassdoor_company),
-        ]
+        results = {SCRAPERS.KUNUNU: kununu_company}
 
         merged = scraper_manager._combined_scraper_results("SAP", results)
 
-        assert merged.alternative_names.count("SAP SE") == 1
+        # Should preserve our search name
+        assert merged.name == "SAP"
+        # Should have kununu identifier
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP SE"
+        # Should have fallback for glassdoor (not scraped)
+        assert merged.scraper_identifiers[SCRAPERS.GLASSDOOR.value] == "SAP"
 
-    def test_does_not_add_search_name_as_alternative(self, scraper_manager):
-        scraped_company = Company(
-            name="SAP",
+    def test_each_scraper_has_own_identifier(self, scraper_manager):
+        """Each scraper should have exactly one identifier"""
+        kununu_company = Company(
+            name="SAP-SE",  # Kununu format with hyphen
             kununu_rating=4.0,
         )
 
-        results = [("KununuScraper", scraped_company)]
+        glassdoor_company = Company(
+            name="SAP SE",  # Glassdoor format with space
+            glassdoor_rating=3.8,
+        )
+
+        results = {
+            SCRAPERS.KUNUNU: kununu_company,
+            SCRAPERS.GLASSDOOR: glassdoor_company,
+        }
 
         merged = scraper_manager._combined_scraper_results("SAP", results)
 
-        assert merged.alternative_names == []
+        # Each scraper has its own unique identifier
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP-SE"
+        assert merged.scraper_identifiers[SCRAPERS.GLASSDOOR.value] == "SAP SE"
+        # No conflicts - each scraper gets its own key
+        assert len(merged.scraper_identifiers) == 2
+
+    def test_uses_search_name_when_scraper_returns_same_name(self, scraper_manager):
+        """When scraped name matches search name, still capture it"""
+        kununu_company = Company(
+            name="SAP",  # Same as search term
+            kununu_rating=4.0,
+        )
+
+        glassdoor_company = Company(
+            name="SAP",  # Same as search term
+            glassdoor_rating=3.8,
+        )
+
+        results = {
+            SCRAPERS.KUNUNU: kununu_company,
+            SCRAPERS.GLASSDOOR: glassdoor_company,
+        }
+
+        merged = scraper_manager._combined_scraper_results("SAP", results)
+
+        # Should still capture identifiers even if they match search name
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP"
+        assert merged.scraper_identifiers[SCRAPERS.GLASSDOOR.value] == "SAP"
+        assert len(merged.scraper_identifiers) == 2
 
 
 @pytest.fixture
@@ -325,22 +342,25 @@ def empty_orchestrator():
 
 
 class TestCompanyDataMerging:
-    """Test company data merging with alternative names"""
+    """Test company data merging with scraper identifiers"""
 
-    def test_combines_alternative_names_from_existing_and_scraped(
+    def test_combines_scraper_identifiers_from_existing_and_scraped(
         self, empty_orchestrator
     ):
-        """Should combine alternative names from both existing and scraped data"""
+        """Should combine scraper identifiers from both existing and scraped data"""
 
         existing = Company(
             name="SAP",
-            alternative_names=["SAP AG"],
+            scraper_identifiers={SCRAPERS.KUNUNU.value: "SAP AG"},
             kununu_rating=4.0,
         )
 
         scraped = Company(
             name="SAP",
-            alternative_names=["SAP SE", "SAP GmbH"],
+            scraper_identifiers={
+                SCRAPERS.KUNUNU.value: "SAP SE",
+                SCRAPERS.GLASSDOOR.value: "SAP GmbH",
+            },
             kununu_rating=4.2,
         )
 
@@ -348,69 +368,31 @@ class TestCompanyDataMerging:
             existing, scraped
         )
 
-        # Should have all unique alternative names
-        assert "SAP AG" in merged.alternative_names
-        assert "SAP SE" in merged.alternative_names
-        assert "SAP GmbH" in merged.alternative_names
-        assert len(merged.alternative_names) == 3
+        # Should have scraped data overwrite existing for same scraper
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP SE"
+        assert merged.scraper_identifiers[SCRAPERS.GLASSDOOR.value] == "SAP GmbH"
+        assert merged.kununu_rating == 4.2
+        assert len(merged.scraper_identifiers) == 2
 
-    def test_avoids_duplicate_alternative_names_in_merge(self, empty_orchestrator):
-        """Should not duplicate alternative names"""
-
-        existing = Company(
-            name="SAP",
-            alternative_names=["SAP SE", "SAP AG"],
-            kununu_rating=4.0,
-        )
-
-        scraped = Company(
-            name="SAP",
-            alternative_names=["SAP SE", "SAP GmbH"],  # "SAP SE" is duplicate
-            glassdoor_rating=3.8,
-        )
-
-        merged = empty_orchestrator._company_scraper_port._merge_company_data(
-            existing, scraped
-        )
-
-        # Should only have one instance of "SAP SE"
-        assert merged.alternative_names.count("SAP SE") == 1
-        assert "SAP AG" in merged.alternative_names
-        assert "SAP GmbH" in merged.alternative_names
-
-    def test_preserves_empty_alternative_names(self, empty_orchestrator):
-        existing = Company(
-            name="SAP",
-            alternative_names=[],
-            kununu_rating=4.0,
-        )
-
-        scraped = Company(
-            name="SAP",
-            alternative_names=[],
-            glassdoor_rating=3.8,
-        )
-
-        merged = empty_orchestrator._company_scraper_port._merge_company_data(
-            existing, scraped
-        )
-
-        assert merged.alternative_names == []
-
-    def test_adds_scraped_alternative_names_when_existing_empty(
+    def test_scraped_identifiers_overwrite_existing_for_same_scraper(
         self, empty_orchestrator
     ):
-        """Should add scraped alternative names when existing has none"""
+        """Should overwrite existing scraper identifiers when rescraped"""
 
         existing = Company(
             name="SAP",
-            alternative_names=[],
+            scraper_identifiers={
+                SCRAPERS.KUNUNU.value: "SAP AG",
+                SCRAPERS.GLASSDOOR.value: "SAP Inc",
+            },
             kununu_rating=4.0,
         )
 
         scraped = Company(
             name="SAP",
-            alternative_names=["SAP SE"],
+            scraper_identifiers={
+                SCRAPERS.KUNUNU.value: "SAP SE"
+            },  # Updated kununu identifier
             glassdoor_rating=3.8,
         )
 
@@ -418,8 +400,51 @@ class TestCompanyDataMerging:
             existing, scraped
         )
 
-        assert "SAP SE" in merged.alternative_names
-        assert len(merged.alternative_names) == 1
+        # Scraped kununu identifier should overwrite existing
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP SE"
+        # Existing glassdoor identifier should be preserved
+        assert merged.scraper_identifiers[SCRAPERS.GLASSDOOR.value] == "SAP Inc"
+
+    def test_preserves_empty_scraper_identifiers(self, empty_orchestrator):
+        existing = Company(
+            name="SAP",
+            scraper_identifiers={},
+            kununu_rating=4.0,
+        )
+
+        scraped = Company(
+            name="SAP",
+            scraper_identifiers={},
+            glassdoor_rating=3.8,
+        )
+
+        merged = empty_orchestrator._company_scraper_port._merge_company_data(
+            existing, scraped
+        )
+
+        assert merged.scraper_identifiers == {}
+
+    def test_adds_scraped_identifiers_when_existing_empty(self, empty_orchestrator):
+        """Should add scraped identifiers when existing has none"""
+
+        existing = Company(
+            name="SAP",
+            scraper_identifiers={},
+            kununu_rating=4.0,
+        )
+
+        scraped = Company(
+            name="SAP",
+            scraper_identifiers={SCRAPERS.KUNUNU.value: "SAP SE"},
+            glassdoor_rating=3.8,
+        )
+
+        merged = empty_orchestrator._company_scraper_port._merge_company_data(
+            existing, scraped
+        )
+
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP SE"
+        assert len(merged.scraper_identifiers) == 1
 
     def test_merges_ratings_from_different_sources(self, empty_orchestrator):
         """Should preserve ratings from different sources"""
@@ -445,3 +470,32 @@ class TestCompanyDataMerging:
         assert merged.kununu_review_count == 100
         assert merged.glassdoor_rating == 3.8
         assert merged.glassdoor_review_count == 200
+
+    def test_replace_none_rating(self, empty_orchestrator):
+        """Should replace None rating with scraped rating"""
+
+        existing = Company(
+            name="SAP",
+            scraper_identifiers={SCRAPERS.KUNUNU.value: "SAP AG"},
+            kununu_rating=None,
+        )
+
+        scraped = Company(
+            name="SAP",
+            scraper_identifiers={
+                SCRAPERS.KUNUNU.value: "SAP SE",
+                SCRAPERS.GLASSDOOR.value: "SAP GmbH",
+            },
+            kununu_rating=4.2,
+        )
+
+        merged = empty_orchestrator._company_scraper_port._merge_company_data(
+            existing, scraped
+        )
+
+        # Should replace None rating with scraped rating
+        assert merged.kununu_rating == 4.2
+        # Should have both scraper identifiers
+        assert merged.scraper_identifiers[SCRAPERS.KUNUNU.value] == "SAP SE"
+        assert merged.scraper_identifiers[SCRAPERS.GLASSDOOR.value] == "SAP GmbH"
+        assert len(merged.scraper_identifiers) == 2

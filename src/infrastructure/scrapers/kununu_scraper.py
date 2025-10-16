@@ -392,10 +392,10 @@ class KununuScraper:
                     f"recommend={result.recommend_percent}%"
                 )
             elif response.status == 404:
-                logger.debug(f"Company page not found (404): {company_name}")
+                logger.info(f"Company page not found (404): {company_name}")
                 result.success = False
             else:
-                logger.warning(
+                logger.info(
                     f"Unexpected status {response.status} for company: {company_name}"
                 )
                 result.success = False

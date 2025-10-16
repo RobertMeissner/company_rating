@@ -28,7 +28,6 @@ def load_kununu_companies(csv_path: str) -> list[Company]:
                 kununu_review_count=0,  # Not available in CSV
                 glassdoor_rating=0,
                 glassdoor_review_count=0,
-                alternative_names=[],
             )
             companies.append(company)
 

@@ -14,6 +14,7 @@ from src.infrastructure.scrapers.company_scraper_manager import CompanyScraperMa
 from src.infrastructure.scrapers.glassdoor_scraper import GlassdoorScraper
 from src.infrastructure.scrapers.jobspy_scraper import JobspyScraper
 from src.infrastructure.scrapers.kununu_scraper import KununuScraper
+from src.models.scraper_model import SCRAPERS
 from src.utils.settings import COMPANY_BLACKLIST_FILENAME, JOB_BLACKLIST_FILENAME
 
 
@@ -33,7 +34,9 @@ def default_orchestrator():
     job_blacklist_adapter = BlacklistFileBasedAdapter(JOB_BLACKLIST_FILENAME)
     job_scraper_adapter = JobspyScraper()
 
-    company_scraper = CompanyScraperManager([KununuScraper, GlassdoorScraper])
+    company_scraper = CompanyScraperManager(
+        {SCRAPERS.KUNUNU: KununuScraper, SCRAPERS.GLASSDOOR: GlassdoorScraper}
+    )
 
     orchestrator = JobOrchestrator(
         job_query_port=job_query_adapter,
