@@ -38,8 +38,8 @@ node:
 	. ${HOME}/.nvm/nvm.sh use node
 
 .PHONY: frontend
-frontend: node
-	cd frontend && bun run dev
+frontend:
+	cd frontend && . ${HOME}/.nvm/nvm.sh use node && bun run dev
 
 frontend-install: node
 	cd frontend && bun install

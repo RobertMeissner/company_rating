@@ -55,8 +55,13 @@ PHRASES_TO_REMOVE = [
     "Corporation",
     "Co.",
     "Company",
+    "BV",
+    "B.V.",
+    "NL",
+    "N.L.",
     # Common prefixes/suffixes
     "The",
+    ".de" ".com",
 ]
 
 
